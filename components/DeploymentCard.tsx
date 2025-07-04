@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { ChevronRight, Calendar, Package } from 'lucide-react-native';
-import { CodePushDeployment } from '@/types/codepush';
+import { CodePushDeployment } from '../types/codepush';
 
 interface DeploymentCardProps {
   deployment: CodePushDeployment;

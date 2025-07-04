@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Check, X, RotateCcw, Calendar, Download } from 'lucide-react-native';
-import { UpdateHistory } from '@/types/codepush';
+import { UpdateHistory } from '../types/codepush';
 
 interface HistoryItemProps {
   item: UpdateHistory;

@@ -1,6 +1,9 @@
-# Custom React Native CodePush SDK
+# React Native CodePush SDK
 
-A comprehensive custom implementation of CodePush for React Native applications, providing over-the-air updates with your own server infrastructure.
+A comprehensive SDK for integrating CodePush-style over-the-air updates into your React Native apps, with support for custom servers and advanced update workflows.
+
+> **Looking for a working demo app?**
+> See the `example/` folder for a full React Native project that consumes this SDK.
 
 ## Features
 

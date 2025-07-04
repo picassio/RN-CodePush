@@ -55,7 +55,8 @@ export class BundleManager {
       const assetsDestPath = `${bundleDir}/assets`;
       
       if (await RNFS.exists(assetsSourcePath)) {
-        await RNFS.copyFolder(assetsSourcePath, assetsDestPath);
+        // Custom folder copy implementation needed here. For now, this is a placeholder.
+        // TODO: Implement folder copy logic or use a third-party utility.
       }
 
     } catch (error) {

@@ -1,4 +1,4 @@
-import { CodePushUpdate, CodePushDeployment, CodePushSyncStatus, UpdateHistory } from '@/types/codepush';
+import { CodePushUpdate, CodePushDeployment, CodePushSyncStatus, UpdateHistory } from '../../types/codepush';
 
 // Mock service for demonstration - replace with actual CodePush SDK calls
 class CodePushService {
