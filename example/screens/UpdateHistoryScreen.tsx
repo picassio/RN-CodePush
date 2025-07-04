@@ -6,7 +6,7 @@ import {
   SafeAreaView,
   FlatList,
 } from 'react-native';
-import { useCodePush } from '../src/sdk/CodePushProvider';
+import { useCodePush } from 'react-native-codepush-sdk';
 import HistoryItem from '../components/HistoryItem';
 
 const UpdateHistoryScreen: React.FC = () => {

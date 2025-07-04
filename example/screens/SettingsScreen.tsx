@@ -8,7 +8,7 @@ import {
   Switch,
   TouchableOpacity,
 } from 'react-native';
-import { useCodePush } from '../src/sdk/CodePushProvider';
+import { useCodePush } from 'react-native-codepush-sdk';
 
 const SettingsScreen: React.FC = () => {
   const { config, updateConfig } = useCodePush();

@@ -9,7 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { useCodePush } from '../src/sdk/CodePushProvider';
+import { useCodePush } from 'react-native-codepush-sdk';
 import { StatusCard } from '../components/StatusCard';
 import { DeploymentCard } from '../components/DeploymentCard';
 
