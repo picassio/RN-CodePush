@@ -1,0 +1,490 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import DeviceInfo from 'react-native-device-info';
+import RNFS from 'react-native-fs';
+import { unzip } from 'react-native-zip-archive';
+import { Platform, NativeModules } from 'react-native';
+
+export interface CodePushConfiguration {
+  serverUrl: string;
+  deploymentKey: string;
+  appVersion: string;
+  checkFrequency?: 'ON_APP_START' | 'ON_APP_RESUME' | 'MANUAL';
+  installMode?: 'IMMEDIATE' | 'ON_NEXT_RESTART' | 'ON_NEXT_RESUME';
+  minimumBackgroundDuration?: number;
+}
+
+export interface UpdatePackage {
+  packageHash: string;
+  label: string;
+  appVersion: string;
+  description: string;
+  isMandatory: boolean;
+  packageSize: number;
+  downloadUrl: string;
+  rollout?: number;
+  isDisabled?: boolean;
+  timestamp: number;
+}
+
+export interface SyncStatus {
+  status: 'CHECKING_FOR_UPDATE' | 'DOWNLOADING_PACKAGE' | 'INSTALLING_UPDATE' | 
+          'UP_TO_DATE' | 'UPDATE_INSTALLED' | 'UPDATE_IGNORED' | 'UNKNOWN_ERROR' | 
+          'AWAITING_USER_ACTION';
+  progress?: number;
+  downloadedBytes?: number;
+  totalBytes?: number;
+}
+
+export interface LocalPackage extends UpdatePackage {
+  localPath: string;
+  isFirstRun: boolean;
+  failedInstall: boolean;
+}
+
+export type SyncStatusCallback = (status: SyncStatus) => void;
+export type DownloadProgressCallback = (progress: { receivedBytes: number; totalBytes: number }) => void;
+
+class CustomCodePush {
+  private config: CodePushConfiguration;
+  private currentPackage: LocalPackage | null = null;
+  private pendingUpdate: UpdatePackage | null = null;
+  private isCheckingForUpdate = false;
+  private isDownloading = false;
+  private isInstalling = false;
+
+  // Storage keys
+  private static readonly CURRENT_PACKAGE_KEY = 'CustomCodePush_CurrentPackage';
+  private static readonly PENDING_UPDATE_KEY = 'CustomCodePush_PendingUpdate';
+  private static readonly FAILED_UPDATES_KEY = 'CustomCodePush_FailedUpdates';
+  private static readonly UPDATE_METADATA_KEY = 'CustomCodePush_UpdateMetadata';
+
+  // File paths
+  private static readonly UPDATES_FOLDER = `${RNFS.DocumentDirectoryPath}/CustomCodePush`;
+  private static readonly BUNDLES_FOLDER = `${CustomCodePush.UPDATES_FOLDER}/bundles`;
+  private static readonly DOWNLOADS_FOLDER = `${CustomCodePush.UPDATES_FOLDER}/downloads`;
+
+  constructor(config: CodePushConfiguration) {
+    this.config = {
+      checkFrequency: 'ON_APP_START',
+      installMode: 'ON_NEXT_RESTART',
+      minimumBackgroundDuration: 0,
+      ...config,
+    };
+    this.initializeDirectories();
+    this.loadCurrentPackage();
+  }
+
+  private async initializeDirectories(): Promise<void> {
+    try {
+      await RNFS.mkdir(CustomCodePush.UPDATES_FOLDER);
+      await RNFS.mkdir(CustomCodePush.BUNDLES_FOLDER);
+      await RNFS.mkdir(CustomCodePush.DOWNLOADS_FOLDER);
+    } catch (error) {
+      console.warn('Failed to create directories:', error);
+    }
+  }
+
+  private async loadCurrentPackage(): Promise<void> {
+    try {
+      const packageData = await AsyncStorage.getItem(CustomCodePush.CURRENT_PACKAGE_KEY);
+      if (packageData) {
+        this.currentPackage = JSON.parse(packageData);
+      }
+    } catch (error) {
+      console.warn('Failed to load current package:', error);
+    }
+  }
+
+  private async saveCurrentPackage(packageInfo: LocalPackage): Promise<void> {
+    try {
+      await AsyncStorage.setItem(CustomCodePush.CURRENT_PACKAGE_KEY, JSON.stringify(packageInfo));
+      this.currentPackage = packageInfo;
+    } catch (error) {
+      console.warn('Failed to save current package:', error);
+    }
+  }
+
+  private async getDeviceInfo(): Promise<any> {
+    return {
+      platform: Platform.OS,
+      platformVersion: Platform.Version,
+      appVersion: this.config.appVersion,
+      deviceId: await DeviceInfo.getUniqueId(),
+      deviceModel: await DeviceInfo.getModel(),
+      currentPackageHash: this.currentPackage?.packageHash || null,
+    };
+  }
+
+  public async checkForUpdate(): Promise<UpdatePackage | null> {
+    if (this.isCheckingForUpdate) {
+      throw new Error('Already checking for update');
+    }
+
+    this.isCheckingForUpdate = true;
+
+    try {
+      const deviceInfo = await this.getDeviceInfo();
+      
+      const response = await fetch(`${this.config.serverUrl}/api/v1/updates/check`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.config.deploymentKey}`,
+        },
+        body: JSON.stringify({
+          deploymentKey: this.config.deploymentKey,
+          appVersion: this.config.appVersion,
+          packageHash: this.currentPackage?.packageHash,
+          ...deviceInfo,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.updateInfo && data.updateInfo.isAvailable) {
+        const updatePackage: UpdatePackage = {
+          packageHash: data.updateInfo.packageHash,
+          label: data.updateInfo.label,
+          appVersion: data.updateInfo.appVersion,
+          description: data.updateInfo.description || '',
+          isMandatory: data.updateInfo.isMandatory || false,
+          packageSize: data.updateInfo.packageSize,
+          downloadUrl: data.updateInfo.downloadUrl,
+          rollout: data.updateInfo.rollout,
+          isDisabled: data.updateInfo.isDisabled,
+          timestamp: Date.now(),
+        };
+
+        this.pendingUpdate = updatePackage;
+        return updatePackage;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error checking for update:', error);
+      throw error;
+    } finally {
+      this.isCheckingForUpdate = false;
+    }
+  }
+
+  public async downloadUpdate(
+    updatePackage: UpdatePackage,
+    progressCallback?: DownloadProgressCallback
+  ): Promise<LocalPackage> {
+    if (this.isDownloading) {
+      throw new Error('Already downloading update');
+    }
+
+    this.isDownloading = true;
+
+    try {
+      const downloadPath = `${CustomCodePush.DOWNLOADS_FOLDER}/${updatePackage.packageHash}.zip`;
+      
+      // Clean up any existing download
+      if (await RNFS.exists(downloadPath)) {
+        await RNFS.unlink(downloadPath);
+      }
+
+      const downloadResult = await RNFS.downloadFile({
+        fromUrl: updatePackage.downloadUrl,
+        toFile: downloadPath,
+        progress: (res) => {
+          if (progressCallback) {
+            progressCallback({
+              receivedBytes: res.bytesWritten,
+              totalBytes: res.contentLength,
+            });
+          }
+        },
+      }).promise;
+
+      if (downloadResult.statusCode !== 200) {
+        throw new Error(`Download failed with status ${downloadResult.statusCode}`);
+      }
+
+      // Verify file size
+      const fileStats = await RNFS.stat(downloadPath);
+      if (fileStats.size !== updatePackage.packageSize) {
+        throw new Error('Downloaded file size mismatch');
+      }
+
+      // Extract the update
+      const extractPath = `${CustomCodePush.BUNDLES_FOLDER}/${updatePackage.packageHash}`;
+      await RNFS.mkdir(extractPath);
+      await unzip(downloadPath, extractPath);
+
+      // Clean up download file
+      await RNFS.unlink(downloadPath);
+
+      const localPackage: LocalPackage = {
+        ...updatePackage,
+        localPath: extractPath,
+        isFirstRun: false,
+        failedInstall: false,
+      };
+
+      // Save update metadata
+      await AsyncStorage.setItem(
+        `${CustomCodePush.UPDATE_METADATA_KEY}_${updatePackage.packageHash}`,
+        JSON.stringify(localPackage)
+      );
+
+      return localPackage;
+    } catch (error) {
+      console.error('Error downloading update:', error);
+      throw error;
+    } finally {
+      this.isDownloading = false;
+    }
+  }
+
+  public async installUpdate(localPackage: LocalPackage): Promise<void> {
+    if (this.isInstalling) {
+      throw new Error('Already installing update');
+    }
+
+    this.isInstalling = true;
+
+    try {
+      // Validate the package
+      const bundlePath = `${localPackage.localPath}/index.bundle`;
+      if (!(await RNFS.exists(bundlePath))) {
+        throw new Error('Bundle file not found in update package');
+      }
+
+      // Mark as current package
+      await this.saveCurrentPackage(localPackage);
+
+      // Clear pending update
+      this.pendingUpdate = null;
+      await AsyncStorage.removeItem(CustomCodePush.PENDING_UPDATE_KEY);
+
+      // Log installation
+      await this.logUpdateInstallation(localPackage, true);
+
+    } catch (error) {
+      console.error('Error installing update:', error);
+      await this.logUpdateInstallation(localPackage, false);
+      throw error;
+    } finally {
+      this.isInstalling = false;
+    }
+  }
+
+  private async logUpdateInstallation(localPackage: LocalPackage, success: boolean): Promise<void> {
+    try {
+      const deviceInfo = await this.getDeviceInfo();
+      
+      await fetch(`${this.config.serverUrl}/api/v1/updates/report`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.config.deploymentKey}`,
+        },
+        body: JSON.stringify({
+          deploymentKey: this.config.deploymentKey,
+          packageHash: localPackage.packageHash,
+          label: localPackage.label,
+          status: success ? 'INSTALLED' : 'FAILED',
+          timestamp: Date.now(),
+          ...deviceInfo,
+        }),
+      });
+    } catch (error) {
+      console.warn('Failed to log update installation:', error);
+    }
+  }
+
+  public async sync(
+    options: {
+      installMode?: 'IMMEDIATE' | 'ON_NEXT_RESTART' | 'ON_NEXT_RESUME';
+      mandatoryInstallMode?: 'IMMEDIATE' | 'ON_NEXT_RESTART' | 'ON_NEXT_RESUME';
+      updateDialog?: boolean;
+      rollbackRetryOptions?: {
+        delayInHours?: number;
+        maxRetryAttempts?: number;
+      };
+    } = {},
+    statusCallback?: SyncStatusCallback,
+    downloadProgressCallback?: DownloadProgressCallback
+  ): Promise<boolean> {
+    try {
+      // Check for update
+      statusCallback?.({ status: 'CHECKING_FOR_UPDATE' });
+      const updatePackage = await this.checkForUpdate();
+
+      if (!updatePackage) {
+        statusCallback?.({ status: 'UP_TO_DATE' });
+        return false;
+      }
+
+      // Show update dialog if needed
+      if (options.updateDialog && updatePackage.isMandatory) {
+        statusCallback?.({ status: 'AWAITING_USER_ACTION' });
+        // In a real implementation, you would show a native dialog here
+        // For now, we'll proceed automatically
+      }
+
+      // Download update
+      statusCallback?.({ status: 'DOWNLOADING_PACKAGE', progress: 0 });
+      const localPackage = await this.downloadUpdate(updatePackage, (progress) => {
+        const progressPercent = (progress.receivedBytes / progress.totalBytes) * 100;
+        statusCallback?.({
+          status: 'DOWNLOADING_PACKAGE',
+          progress: progressPercent,
+          downloadedBytes: progress.receivedBytes,
+          totalBytes: progress.totalBytes,
+        });
+        downloadProgressCallback?.(progress);
+      });
+
+      // Install update
+      statusCallback?.({ status: 'INSTALLING_UPDATE' });
+      await this.installUpdate(localPackage);
+
+      const installMode = updatePackage.isMandatory 
+        ? (options.mandatoryInstallMode || 'IMMEDIATE')
+        : (options.installMode || this.config.installMode || 'ON_NEXT_RESTART');
+
+      if (installMode === 'IMMEDIATE') {
+        // Restart the app immediately
+        this.restartApp();
+      }
+
+      statusCallback?.({ status: 'UPDATE_INSTALLED' });
+      return true;
+
+    } catch (error) {
+      console.error('Sync error:', error);
+      statusCallback?.({ status: 'UNKNOWN_ERROR' });
+      return false;
+    }
+  }
+
+  public async getCurrentPackage(): Promise<LocalPackage | null> {
+    return this.currentPackage;
+  }
+
+  public async getUpdateMetadata(): Promise<LocalPackage | null> {
+    return this.currentPackage;
+  }
+
+  public async clearUpdates(): Promise<void> {
+    try {
+      // Clear storage
+      await AsyncStorage.multiRemove([
+        CustomCodePush.CURRENT_PACKAGE_KEY,
+        CustomCodePush.PENDING_UPDATE_KEY,
+        CustomCodePush.FAILED_UPDATES_KEY,
+      ]);
+
+      // Clear files
+      if (await RNFS.exists(CustomCodePush.UPDATES_FOLDER)) {
+        await RNFS.unlink(CustomCodePush.UPDATES_FOLDER);
+      }
+
+      // Reinitialize
+      await this.initializeDirectories();
+      this.currentPackage = null;
+      this.pendingUpdate = null;
+
+    } catch (error) {
+      console.error('Error clearing updates:', error);
+      throw error;
+    }
+  }
+
+  public async rollback(): Promise<void> {
+    if (!this.currentPackage) {
+      throw new Error('No current package to rollback from');
+    }
+
+    try {
+      // Remove current package
+      const packagePath = this.currentPackage.localPath;
+      if (await RNFS.exists(packagePath)) {
+        await RNFS.unlink(packagePath);
+      }
+
+      // Clear current package
+      await AsyncStorage.removeItem(CustomCodePush.CURRENT_PACKAGE_KEY);
+      this.currentPackage = null;
+
+      // Log rollback
+      await this.logRollback();
+
+      // Restart app to use original bundle
+      this.restartApp();
+
+    } catch (error) {
+      console.error('Error during rollback:', error);
+      throw error;
+    }
+  }
+
+  private async logRollback(): Promise<void> {
+    try {
+      const deviceInfo = await this.getDeviceInfo();
+      
+      await fetch(`${this.config.serverUrl}/api/v1/updates/rollback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.config.deploymentKey}`,
+        },
+        body: JSON.stringify({
+          deploymentKey: this.config.deploymentKey,
+          packageHash: this.currentPackage?.packageHash,
+          timestamp: Date.now(),
+          ...deviceInfo,
+        }),
+      });
+    } catch (error) {
+      console.warn('Failed to log rollback:', error);
+    }
+  }
+
+  private restartApp(): void {
+    // In a real implementation, you would use a native module to restart the app
+    // For now, we'll just reload the React Native bundle
+    if (Platform.OS === 'android') {
+      // Android restart implementation
+      NativeModules.DevSettings?.reload();
+    } else {
+      // iOS restart implementation
+      NativeModules.DevSettings?.reload();
+    }
+  }
+
+  public getBundleUrl(): string | null {
+    if (this.currentPackage && this.currentPackage.localPath) {
+      return `file://${this.currentPackage.localPath}/index.bundle`;
+    }
+    return null;
+  }
+
+  // Static methods for easy integration
+  public static configure(config: CodePushConfiguration): CustomCodePush {
+    return new CustomCodePush(config);
+  }
+
+  public static async checkForUpdate(instance: CustomCodePush): Promise<UpdatePackage | null> {
+    return instance.checkForUpdate();
+  }
+
+  public static async sync(
+    instance: CustomCodePush,
+    options?: any,
+    statusCallback?: SyncStatusCallback,
+    downloadProgressCallback?: DownloadProgressCallback
+  ): Promise<boolean> {
+    return instance.sync(options, statusCallback, downloadProgressCallback);
+  }
+}
+
+export default CustomCodePush;

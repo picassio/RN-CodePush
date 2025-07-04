@@ -1,100 +1,205 @@
-# CodePush SDK Example App
+# CodePush Demo App
 
-This is a simple React Native example app demonstrating how to use the Custom CodePush SDK.
+A complete React Native demo application showcasing the CodePush SDK functionality.
 
-## Features Demonstrated
+## Features
 
-- ✅ Check for updates manually and automatically
-- ✅ Download and install updates with progress tracking
-- ✅ Handle mandatory vs optional updates
-- ✅ Rollback functionality
-- ✅ Update history and status tracking
-- ✅ Error handling and retry mechanisms
+- 📱 React Native 0.74.4 with full Android & iOS support
+- 🔄 CodePush SDK integration with custom implementation
+- 🎯 Mock server for testing CodePush functionality
+- 🧭 Navigation between demo screens
+- ⚙️ Settings management
+- 📊 Update history tracking
+- 🔧 Configurable update behavior
 
-## Setup
+## Project Structure
 
-1. **Install Dependencies**
+```
+example/
+├── android/                 # Android project files
+├── ios/                     # iOS project files
+├── src/
+│   ├── sdk/                 # CodePush SDK implementation
+│   │   ├── CodePushProvider.tsx
+│   │   └── CustomCodePush.ts
+│   ├── components/          # SDK components
+│   │   └── UpdateChecker.tsx
+│   ├── utils/               # Utility functions
+│   └── api/                 # API helpers
+├── components/              # Demo UI components
+│   ├── StatusCard.tsx
+│   ├── DeploymentCard.tsx
+│   └── HistoryItem.tsx
+├── screens/                 # Demo screens
+│   ├── HomeScreen.tsx
+│   ├── SettingsScreen.tsx
+│   └── UpdateHistoryScreen.tsx
+├── config/                  # Configuration files
+│   └── codepush.config.ts
+├── mock-server/             # Mock CodePush server
+│   ├── server.js
+│   └── package.json
+├── hooks/                   # Custom React hooks
+├── services/                # Service implementations
+├── types/                   # TypeScript type definitions
+└── README.md
+```
+
+## Quick Start
+
+### 1. Install Dependencies
+
 ```bash
 cd example
 npm install
 ```
 
-2. **Configure Your Server**
-Edit `src/config/codepush.config.ts` and update:
-- `serverUrl`: Your custom CodePush server URL
-- `deploymentKey`: Your deployment key
-- `appVersion`: Your app version
+### 2. Start the Mock Server
 
-3. **Run the App**
 ```bash
-# iOS
-npm run ios
+npm run mock-server
+```
 
-# Android
+The mock server will run on `http://localhost:3000` and provide:
+- Update checking endpoints
+- Package upload/download
+- Deployment management
+- Status reporting
+
+### 3. Run the Demo App
+
+#### Android
+```bash
 npm run android
 ```
 
-## Demo Scenarios
-
-### 1. Basic Update Check
-- Tap "Check for Updates" to manually check
-- See status messages and progress indicators
-
-### 2. Automatic Updates
-- Enable auto-check in settings
-- App will check for updates on start and resume
-
-### 3. Mandatory Updates
-- Server can mark updates as mandatory
-- User cannot skip mandatory updates
-
-### 4. Rollback Testing
-- Install an update
-- Use "Rollback" to revert to previous version
-
-### 5. Error Handling
-- Disconnect network during download
-- See error states and retry options
-
-## Mock Server
-
-The example includes a mock server implementation for testing:
-
+#### iOS
 ```bash
-cd example/mock-server
-npm install
-npm start
+npm run ios
 ```
 
-This will start a local server at `http://localhost:3000` that simulates CodePush server responses.
+## Demo Features
 
-## File Structure
+### Home Screen
+- Check for updates manually
+- Force update functionality
+- View current deployment status
+- Monitor update progress
+- Access settings and history
 
+### Settings Screen
+- Toggle auto-download
+- Toggle auto-install
+- View current configuration
+- Modify update behavior
+
+### Update History Screen
+- View all previous updates
+- See update details and timestamps
+- Track deployment history
+
+## Configuration
+
+The demo uses a configuration file at `config/codepush.config.ts`:
+
+```typescript
+export const defaultConfig: CodePushConfig = {
+  serverUrl: 'http://localhost:3000',
+  deploymentKey: 'production-key-123',
+  appVersion: '1.0.0',
+  autoDownload: true,
+  autoInstall: true,
+  checkFrequency: 'ON_APP_START',
+  installMode: 'IMMEDIATE',
+  // ... more options
+};
 ```
-example/
-├── src/
-│   ├── components/          # UI components
-│   ├── config/             # Configuration files
-│   ├── screens/            # App screens
-│   ├── utils/              # Utility functions
-│   └── App.tsx             # Main app component
-├── mock-server/            # Mock CodePush server
-└── package.json
+
+## Mock Server API
+
+The included mock server provides a complete CodePush-compatible API:
+
+### Endpoints
+- `GET /v0.1/apps/:appName/deployments` - List deployments
+- `POST /v0.1/public/codepush/update_check` - Check for updates
+- `POST /v0.1/public/codepush/report_status/deploy` - Report deployment status
+- `POST /v0.1/apps/:appName/deployments/:deploymentName/release` - Upload updates
+
+### Testing Updates
+1. Start the mock server
+2. Launch the demo app
+3. Use "Check for Updates" to test the update flow
+4. Monitor the console for API calls and responses
+
+## Development
+
+### Adding New Features
+1. Extend the CodePush SDK in `src/sdk/`
+2. Add new screens in `screens/`
+3. Create UI components in `components/`
+4. Update configuration in `config/`
+
+### Customizing the Mock Server
+Edit `mock-server/server.js` to:
+- Add new endpoints
+- Modify update logic
+- Change deployment configurations
+- Add authentication
+
+## SDK Integration
+
+The demo shows how to integrate the CodePush SDK:
+
+```typescript
+// In your app root
+import { CodePushProvider } from './src/sdk/CodePushProvider';
+import { defaultConfig } from './config/codepush.config';
+
+function App() {
+  return (
+    <CodePushProvider config={defaultConfig}>
+      {/* Your app content */}
+    </CodePushProvider>
+  );
+}
 ```
 
-## Testing Updates
+```typescript
+// In your components
+import { useCodePush } from './src/sdk/CodePushProvider';
 
-1. **Create Update Package**
-   - Bundle your React Native app
-   - Create a ZIP file with the bundle and assets
-   - Upload to your server or use the mock server
+function MyComponent() {
+  const { checkForUpdate, syncStatus, updateInfo } = useCodePush();
+  
+  const handleUpdate = async () => {
+    await checkForUpdate();
+  };
+  
+  return (
+    // Your component JSX
+  );
+}
+```
 
-2. **Test Update Flow**
-   - Check for updates
-   - Download and install
-   - Verify new version is active
+## Troubleshooting
 
-3. **Test Rollback**
-   - Install an update
-   - Trigger rollback
-   - Verify previous version is restored
+### Common Issues
+
+1. **Metro bundler issues**: Clear cache with `npx react-native start --reset-cache`
+2. **Android build issues**: Clean and rebuild with `cd android && ./gradlew clean`
+3. **iOS build issues**: Clean derived data in Xcode
+4. **Mock server not responding**: Check that port 3000 is available
+
+### Debug Mode
+Enable debug logging by setting `DEBUG=true` in your environment or configuration.
+
+## Next Steps
+
+1. **Production Setup**: Replace mock server with real CodePush service
+2. **Authentication**: Add proper authentication to your CodePush server
+3. **CI/CD Integration**: Automate update deployments
+4. **Advanced Features**: Add rollback, A/B testing, and analytics
+
+## License
+
+This demo is provided as-is for educational and testing purposes.

@@ -1,58 +1,42 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { StatusBar } from 'react-native';
-
-import { CodePushProvider } from '../src/sdk/CodePushProvider';
-import HomeScreen from './src/screens/HomeScreen';
-import SettingsScreen from './src/screens/SettingsScreen';
-import UpdateHistoryScreen from './src/screens/UpdateHistoryScreen';
-import { codePushConfig } from './src/config/codepush.config';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { CodePushProvider } from './src/sdk/CodePushProvider';
+import UpdateChecker from './src/components/UpdateChecker';
+import HomeScreen from './screens/HomeScreen';
+import SettingsScreen from './screens/SettingsScreen';
+import UpdateHistoryScreen from './screens/UpdateHistoryScreen';
+import { defaultConfig } from './config/codepush.config';
 
 const Stack = createStackNavigator();
 
 const App: React.FC = () => {
   return (
-    <SafeAreaProvider>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-      <CodePushProvider 
-        config={codePushConfig} 
-        autoCheck={true} 
-        checkOnResume={true}
-      >
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <CodePushProvider config={defaultConfig}>
         <NavigationContainer>
-          <Stack.Navigator
-            initialRouteName="Home"
-            screenOptions={{
-              headerStyle: {
-                backgroundColor: '#007bff',
-              },
-              headerTintColor: '#ffffff',
-              headerTitleStyle: {
-                fontWeight: 'bold',
-              },
-            }}
-          >
+          <Stack.Navigator initialRouteName="Home">
             <Stack.Screen 
               name="Home" 
-              component={HomeScreen}
+              component={HomeScreen} 
               options={{ title: 'CodePush Demo' }}
             />
             <Stack.Screen 
               name="Settings" 
-              component={SettingsScreen}
+              component={SettingsScreen} 
               options={{ title: 'Settings' }}
             />
             <Stack.Screen 
               name="UpdateHistory" 
-              component={UpdateHistoryScreen}
+              component={UpdateHistoryScreen} 
               options={{ title: 'Update History' }}
             />
           </Stack.Navigator>
         </NavigationContainer>
+        <UpdateChecker />
       </CodePushProvider>
-    </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 };
 
