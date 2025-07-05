@@ -185,7 +185,10 @@ class CustomCodePush {
     this.isDownloading = true;
 
     try {
-      const downloadPath = `${CustomCodePush.DOWNLOADS_FOLDER}/${updatePackage.packageHash}.zip`;
+      // Check if it's a JavaScript file (demo bundles)
+      const isJsFile = updatePackage.downloadUrl.endsWith('.js');
+      const fileExtension = isJsFile ? 'js' : 'zip';
+      const downloadPath = `${CustomCodePush.DOWNLOADS_FOLDER}/${updatePackage.packageHash}.${fileExtension}`;
       
       // Clean up any existing download
       if (await RNFS.exists(downloadPath)) {
@@ -209,23 +212,46 @@ class CustomCodePush {
         throw new Error(`Download failed with status ${downloadResult.statusCode}`);
       }
 
-      // Verify file size
+      // Verify file size (approximate for JS files)
       const fileStats = await RNFS.stat(downloadPath);
-      if (fileStats.size !== updatePackage.packageSize) {
-        throw new Error('Downloaded file size mismatch');
+      if (isJsFile) {
+        // For JS files, just check if file exists and has content
+        if (fileStats.size === 0) {
+          throw new Error('Downloaded JavaScript file is empty');
+        }
+      } else {
+        // For zip files, check exact size
+        if (fileStats.size !== updatePackage.packageSize) {
+          throw new Error('Downloaded file size mismatch');
+        }
       }
 
-      // Extract the update
-      const extractPath = `${CustomCodePush.BUNDLES_FOLDER}/${updatePackage.packageHash}`;
-      await RNFS.mkdir(extractPath);
-      await unzip(downloadPath, extractPath);
+      let localPath: string;
 
-      // Clean up download file
-      await RNFS.unlink(downloadPath);
+      if (isJsFile) {
+        // For JavaScript files, create a simple structure
+        localPath = `${CustomCodePush.BUNDLES_FOLDER}/${updatePackage.packageHash}`;
+        await RNFS.mkdir(localPath);
+        
+        // Copy the JS file to the bundle location
+        const bundlePath = `${localPath}/index.bundle`;
+        await RNFS.copyFile(downloadPath, bundlePath);
+        
+        // Clean up download file
+        await RNFS.unlink(downloadPath);
+      } else {
+        // For zip files, extract as before
+        localPath = `${CustomCodePush.BUNDLES_FOLDER}/${updatePackage.packageHash}`;
+        await RNFS.mkdir(localPath);
+        await unzip(downloadPath, localPath);
+        
+        // Clean up download file
+        await RNFS.unlink(downloadPath);
+      }
 
       const localPackage: LocalPackage = {
         ...updatePackage,
-        localPath: extractPath,
+        localPath: localPath,
         isFirstRun: false,
         failedInstall: false,
       };

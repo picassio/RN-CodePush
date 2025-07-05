@@ -51,14 +51,14 @@ let updatePackages = [
     id: '1',
     label: 'v1.0.1',
     appVersion: '1.0.0',
-    description: 'Bug fixes and performance improvements',
+    description: 'Demo bundle with basic functionality - Dynamic bundle loading, Version management, Hot updates',
     isDisabled: false,
     isMandatory: false,
     rollout: 100,
-    downloadUrl: 'https://example.com/updates/v1.0.1.zip',
-    size: 1024000,
+    downloadUrl: 'http://192.168.0.103:3000/demo-bundles/v1.0.1.js',
+    size: 2048,
     packageHash: 'abc123def456',
-    blobUrl: 'https://example.com/blobs/abc123def456',
+    blobUrl: 'http://192.168.0.103:3000/demo-bundles/v1.0.1.js',
     uploadTime: new Date().toISOString(),
     releasedBy: 'developer@example.com'
   },
@@ -66,14 +66,14 @@ let updatePackages = [
     id: '2',
     label: 'v1.0.2',
     appVersion: '1.0.0',
-    description: 'New features and UI improvements',
+    description: 'Enhanced demo bundle with advanced features - Enhanced UI, Performance improvements, Bug fixes',
     isDisabled: false,
     isMandatory: true,
     rollout: 50,
-    downloadUrl: 'https://example.com/updates/v1.0.2.zip',
-    size: 2048000,
+    downloadUrl: 'http://192.168.0.103:3000/demo-bundles/v1.0.2.js',
+    size: 3072,
     packageHash: 'def456ghi789',
-    blobUrl: 'https://example.com/blobs/def456ghi789',
+    blobUrl: 'http://192.168.0.103:3000/demo-bundles/v1.0.2.js',
     uploadTime: new Date().toISOString(),
     releasedBy: 'developer@example.com'
   }
@@ -189,6 +189,9 @@ app.post('/v0.1/apps/:appName/deployments/:deploymentName/release', upload.singl
 
 // Serve uploaded files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Serve demo bundles
+app.use('/demo-bundles', express.static(path.join(__dirname, 'demo-bundles')));
 
 // Health check
 app.get('/health', (req, res) => {

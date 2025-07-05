@@ -14,6 +14,7 @@ interface CodePushContextType {
   syncUpdate: () => Promise<void>;
   rollback: () => Promise<void>;
   clearUpdates: () => Promise<void>;
+  getBundleUrl: () => string | null;
 }
 
 const CodePushContext = createContext<CodePushContextType | undefined>(undefined);
@@ -158,6 +159,7 @@ export const CodePushProvider: React.FC<CodePushProviderProps> = ({
     syncUpdate,
     rollback,
     clearUpdates,
+    getBundleUrl: () => codePush.getBundleUrl(),
   };
 
   return (
