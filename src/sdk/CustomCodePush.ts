@@ -7,7 +7,7 @@ import { Platform, NativeModules } from 'react-native';
 export interface CodePushConfiguration {
   serverUrl: string;
   deploymentKey: string;
-  appVersion: string;
+  appName: string;
   checkFrequency?: 'ON_APP_START' | 'ON_APP_RESUME' | 'MANUAL';
   installMode?: 'IMMEDIATE' | 'ON_NEXT_RESTART' | 'ON_NEXT_RESUME';
   minimumBackgroundDuration?: number;
@@ -108,9 +108,10 @@ class CustomCodePush {
     return {
       platform: Platform.OS,
       platformVersion: Platform.Version,
-      appVersion: this.config.appVersion,
+      appVersion: await DeviceInfo.getVersion(),
       deviceId: await DeviceInfo.getUniqueId(),
       deviceModel: await DeviceInfo.getModel(),
+      clientUniqueId: await DeviceInfo.getUniqueId(),
       currentPackageHash: this.currentPackage?.packageHash || null,
     };
   }
@@ -132,7 +133,7 @@ class CustomCodePush {
         },
         body: JSON.stringify({
           deploymentKey: this.config.deploymentKey,
-          appVersion: this.config.appVersion || '1.0.0',
+          appVersion: deviceInfo.appVersion || '1.0.0',
           packageHash: this.currentPackage?.packageHash,
           clientUniqueId: deviceInfo.clientUniqueId,
           label: this.currentPackage?.label,
@@ -165,6 +166,7 @@ class CustomCodePush {
 
       return null;
     } catch (error) {
+      console.log('Error checking for update:', error);
       console.error('Error checking for update:', error);
       throw error;
     } finally {

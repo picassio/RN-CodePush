@@ -1,13 +1,10 @@
-import { CodePushConfiguration } from 'react-native-codepush-sdk';
+import { CodePushConfiguration } from '../types/codepush';
 
 export const defaultConfig: CodePushConfiguration = {
   serverUrl: 'http://192.168.0.103:3000',
   deploymentKey: 'production-key-123',
-  // appVersion: '1.0.0',
-  // autoDownload: true,
-  // autoInstall: true,
+  appName: 'CodePushDemo',
   checkFrequency: 'ON_APP_START',
   installMode: 'IMMEDIATE',
-  appName: 'CodePushDemo',
   minimumBackgroundDuration: 0
 }; 
