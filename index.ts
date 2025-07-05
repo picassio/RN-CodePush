@@ -1,5 +1,5 @@
 // Main entry point for React Native CodePush SDK
-export { CodePushProvider } from './src/sdk/CodePushProvider';
+export { CodePushProvider, useCodePush } from './src/sdk/CodePushProvider';
 export { default as CustomCodePush } from './src/sdk/CustomCodePush';
 export { default as UpdateChecker } from './src/components/UpdateChecker';
 export { BundleManager } from './src/utils/BundleManager';

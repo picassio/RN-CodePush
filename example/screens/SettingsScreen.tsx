@@ -11,20 +11,16 @@ import {
 import { useCodePush } from 'react-native-codepush-sdk';
 
 const SettingsScreen: React.FC = () => {
-  const { config, updateConfig } = useCodePush();
+  const { currentUpdate, availableUpdate, isChecking, isDownloading, isInstalling } = useCodePush();
 
   const handleToggleAutoDownload = () => {
-    updateConfig({
-      ...config,
-      autoDownload: !config.autoDownload,
-    });
+    // TODO: Implement config update functionality
+    console.log('Auto download toggle - not implemented yet');
   };
 
   const handleToggleAutoInstall = () => {
-    updateConfig({
-      ...config,
-      autoInstall: !config.autoInstall,
-    });
+    // TODO: Implement config update functionality
+    console.log('Auto install toggle - not implemented yet');
   };
 
   return (
@@ -36,7 +32,7 @@ const SettingsScreen: React.FC = () => {
           <View style={styles.settingRow}>
             <Text style={styles.settingLabel}>Auto Download</Text>
             <Switch
-              value={config.autoDownload}
+              value={false}
               onValueChange={handleToggleAutoDownload}
             />
           </View>
@@ -44,25 +40,27 @@ const SettingsScreen: React.FC = () => {
           <View style={styles.settingRow}>
             <Text style={styles.settingLabel}>Auto Install</Text>
             <Switch
-              value={config.autoInstall}
+              value={false}
               onValueChange={handleToggleAutoInstall}
             />
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Configuration</Text>
+          <Text style={styles.sectionTitle}>Current Status</Text>
           <View style={styles.configRow}>
-            <Text style={styles.configLabel}>Server URL:</Text>
-            <Text style={styles.configValue}>{config.serverUrl}</Text>
+            <Text style={styles.configLabel}>Current Update:</Text>
+            <Text style={styles.configValue}>{currentUpdate ? `v${currentUpdate.appVersion}` : 'None'}</Text>
           </View>
           <View style={styles.configRow}>
-            <Text style={styles.configLabel}>Deployment Key:</Text>
-            <Text style={styles.configValue}>{config.deploymentKey}</Text>
+            <Text style={styles.configLabel}>Available Update:</Text>
+            <Text style={styles.configValue}>{availableUpdate ? `v${availableUpdate.appVersion}` : 'None'}</Text>
           </View>
           <View style={styles.configRow}>
-            <Text style={styles.configLabel}>App Version:</Text>
-            <Text style={styles.configValue}>{config.appVersion}</Text>
+            <Text style={styles.configLabel}>Status:</Text>
+            <Text style={styles.configValue}>
+              {isChecking ? 'Checking...' : isDownloading ? 'Downloading...' : isInstalling ? 'Installing...' : 'Idle'}
+            </Text>
           </View>
         </View>
       </ScrollView>

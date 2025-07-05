@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { useCodePush } from '../sdk/CodePushProvider';
+import { useCodePush } from 'react-native-codepush-sdk';
 
 const UpdateChecker: React.FC = () => {
   const {

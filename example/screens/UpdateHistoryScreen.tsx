@@ -10,7 +10,10 @@ import { useCodePush } from 'react-native-codepush-sdk';
 import HistoryItem from '../components/HistoryItem';
 
 const UpdateHistoryScreen: React.FC = () => {
-  const { updateHistory } = useCodePush();
+  const { currentUpdate, availableUpdate } = useCodePush();
+
+  // Mock update history for now
+  const updateHistory = currentUpdate ? [currentUpdate] : [];
 
   const renderHistoryItem = ({ item }: { item: any }) => (
     <HistoryItem item={item} />
@@ -36,7 +39,7 @@ const UpdateHistoryScreen: React.FC = () => {
         <FlatList
           data={updateHistory}
           renderItem={renderHistoryItem}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item.packageHash}
           style={styles.list}
           contentContainerStyle={styles.listContent}
         />

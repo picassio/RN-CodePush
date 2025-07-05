@@ -10,18 +10,20 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useCodePush } from 'react-native-codepush-sdk';
-import { StatusCard } from '../components/StatusCard';
-import { DeploymentCard } from '../components/DeploymentCard';
+import StatusCard from '../components/StatusCard';
+import DeploymentCard from '../components/DeploymentCard';
 
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation();
   const { 
     checkForUpdate, 
-    syncInProgress, 
-    updateInfo, 
+    syncUpdate,
+    isChecking,
+    isDownloading,
+    isInstalling,
     syncStatus, 
-    downloadProgress,
-    currentPackage 
+    currentUpdate,
+    availableUpdate
   } = useCodePush();
 
   const handleCheckForUpdate = async () => {
@@ -34,7 +36,7 @@ const HomeScreen: React.FC = () => {
 
   const handleForceUpdate = async () => {
     try {
-      await checkForUpdate(true);
+      await syncUpdate();
     } catch (error) {
       Alert.alert('Error', 'Failed to force update');
     }
@@ -44,41 +46,38 @@ const HomeScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView}>
         <StatusCard
-          syncStatus={syncStatus}
-          syncInProgress={syncInProgress}
-          downloadProgress={downloadProgress}
-          updateInfo={updateInfo}
-        />
-
-        <DeploymentCard
-          currentPackage={currentPackage}
-          updateInfo={updateInfo}
+          status={isChecking || isDownloading || isInstalling ? 'updating' : availableUpdate ? 'update-available' : 'up-to-date'}
+          title={isChecking ? 'Checking for Updates' : availableUpdate ? 'Update Available' : 'App is Up to Date'}
+          description={isChecking ? 'Checking for new updates...' : availableUpdate ? `Version ${availableUpdate.appVersion} is available` : 'Your app is running the latest version'}
+          onAction={availableUpdate ? handleForceUpdate : undefined}
+          actionText={availableUpdate ? 'Install Update' : undefined}
+          progress={syncStatus?.progress}
         />
 
         <View style={styles.buttonContainer}>
           <TouchableOpacity
             style={[styles.button, styles.primaryButton]}
             onPress={handleCheckForUpdate}
-            disabled={syncInProgress}
+            disabled={isChecking || isDownloading || isInstalling}
           >
             <Text style={styles.buttonText}>
-              {syncInProgress ? 'Checking...' : 'Check for Updates'}
+              {isChecking ? 'Checking...' : 'Check for Updates'}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.button, styles.secondaryButton]}
             onPress={handleForceUpdate}
-            disabled={syncInProgress}
+            disabled={isChecking || isDownloading || isInstalling || !availableUpdate}
           >
             <Text style={styles.buttonTextSecondary}>
-              Force Update
+              Install Update
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.button, styles.secondaryButton]}
-            onPress={() => navigation.navigate('Settings')}
+            onPress={() => navigation.navigate('Settings' as never)}
           >
             <Text style={styles.buttonTextSecondary}>
               Settings
@@ -87,7 +86,7 @@ const HomeScreen: React.FC = () => {
 
           <TouchableOpacity
             style={[styles.button, styles.secondaryButton]}
-            onPress={() => navigation.navigate('UpdateHistory')}
+            onPress={() => navigation.navigate('UpdateHistory' as never)}
           >
             <Text style={styles.buttonTextSecondary}>
               Update History

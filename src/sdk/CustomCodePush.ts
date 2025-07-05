@@ -125,17 +125,17 @@ class CustomCodePush {
     try {
       const deviceInfo = await this.getDeviceInfo();
       
-      const response = await fetch(`${this.config.serverUrl}/api/v1/updates/check`, {
+      const response = await fetch(`${this.config.serverUrl}/v0.1/public/codepush/update_check`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.config.deploymentKey}`,
         },
         body: JSON.stringify({
           deploymentKey: this.config.deploymentKey,
-          appVersion: this.config.appVersion,
+          appVersion: this.config.appVersion || '1.0.0',
           packageHash: this.currentPackage?.packageHash,
-          ...deviceInfo,
+          clientUniqueId: deviceInfo.clientUniqueId,
+          label: this.currentPackage?.label,
         }),
       });
 
@@ -145,14 +145,14 @@ class CustomCodePush {
 
       const data = await response.json();
       
-      if (data.updateInfo && data.updateInfo.isAvailable) {
+      if (data.updateInfo) {
         const updatePackage: UpdatePackage = {
           packageHash: data.updateInfo.packageHash,
           label: data.updateInfo.label,
           appVersion: data.updateInfo.appVersion,
           description: data.updateInfo.description || '',
           isMandatory: data.updateInfo.isMandatory || false,
-          packageSize: data.updateInfo.packageSize,
+          packageSize: data.updateInfo.size || 0,
           downloadUrl: data.updateInfo.downloadUrl,
           rollout: data.updateInfo.rollout,
           isDisabled: data.updateInfo.isDisabled,
@@ -280,19 +280,16 @@ class CustomCodePush {
     try {
       const deviceInfo = await this.getDeviceInfo();
       
-      await fetch(`${this.config.serverUrl}/api/v1/updates/report`, {
+      await fetch(`${this.config.serverUrl}/v0.1/public/codepush/report_status/deploy`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.config.deploymentKey}`,
         },
         body: JSON.stringify({
           deploymentKey: this.config.deploymentKey,
-          packageHash: localPackage.packageHash,
           label: localPackage.label,
-          status: success ? 'INSTALLED' : 'FAILED',
-          timestamp: Date.now(),
-          ...deviceInfo,
+          status: success ? 'Deployed' : 'Failed',
+          clientUniqueId: deviceInfo.clientUniqueId,
         }),
       });
     } catch (error) {
@@ -431,17 +428,16 @@ class CustomCodePush {
     try {
       const deviceInfo = await this.getDeviceInfo();
       
-      await fetch(`${this.config.serverUrl}/api/v1/updates/rollback`, {
+      await fetch(`${this.config.serverUrl}/v0.1/public/codepush/report_status/deploy`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.config.deploymentKey}`,
         },
         body: JSON.stringify({
           deploymentKey: this.config.deploymentKey,
-          packageHash: this.currentPackage?.packageHash,
-          timestamp: Date.now(),
-          ...deviceInfo,
+          label: this.currentPackage?.label || 'unknown',
+          status: 'Rollback',
+          clientUniqueId: deviceInfo.clientUniqueId,
         }),
       });
     } catch (error) {

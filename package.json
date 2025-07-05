@@ -32,7 +32,6 @@
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^1.23.1",
-    "lucide-react-native": "^0.525.0",
     "react-native-device-info": "^10.13.0",
     "react-native-fs": "^2.20.0",
     "react-native-zip-archive": "^6.1.0"
