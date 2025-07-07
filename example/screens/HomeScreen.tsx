@@ -36,6 +36,7 @@ const HomeScreen: React.FC = () => {
 
   const handleForceUpdate = async () => {
     try {
+      console.log('handleForceUpdate');
       await syncUpdate();
     } catch (error) {
       Alert.alert('Error', 'Failed to force update');
@@ -92,18 +93,15 @@ const HomeScreen: React.FC = () => {
               Update History
             </Text>
           </TouchableOpacity>
-        </View>
-
-        <View style={styles.infoContainer}>
-          <Text style={styles.infoTitle}>About CodePush Demo</Text>
-          <Text style={styles.infoText}>
-            This demo showcases the CodePush SDK functionality including:
-          </Text>
-          <Text style={styles.infoText}>• Automatic update checking</Text>
-          <Text style={styles.infoText}>• Manual update triggers</Text>
-          <Text style={styles.infoText}>• Update progress tracking</Text>
-          <Text style={styles.infoText}>• Deployment management</Text>
-          <Text style={styles.infoText}>• Update history</Text>
+          <TouchableOpacity
+            style={[styles.button, styles.secondaryButton]}
+            onPress={() => navigation.navigate('RuntimeBundle' as never)}
+          >
+            <Text style={styles.buttonTextSecondary}>
+              Runtime Bundle
+            </Text>
+          </TouchableOpacity>
+          
         </View>
       </ScrollView>
     </SafeAreaView>

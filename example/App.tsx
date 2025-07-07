@@ -4,10 +4,10 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { CodePushProvider } from 'react-native-codepush-sdk';
 import UpdateChecker from './src/components/UpdateChecker';
-import BundleLoader from './src/components/BundleLoader';
 import HomeScreen from './screens/HomeScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import UpdateHistoryScreen from './screens/UpdateHistoryScreen';
+import RuntimeBundleScreen from './screens/RuntimeBundleScreen';
 import { defaultConfig } from './config/codepush.config';
 
 const Stack = createStackNavigator();
@@ -16,27 +16,30 @@ const App: React.FC = () => {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <CodePushProvider config={defaultConfig}>
-        <BundleLoader>
-          <NavigationContainer>
-            <Stack.Navigator initialRouteName="Home">
-              <Stack.Screen 
-                name="Home" 
-                component={HomeScreen} 
-                options={{ title: 'CodePush Demo' }}
-              />
-              <Stack.Screen 
-                name="Settings" 
-                component={SettingsScreen} 
-                options={{ title: 'Settings' }}
-              />
-              <Stack.Screen 
-                name="UpdateHistory" 
-                component={UpdateHistoryScreen} 
-                options={{ title: 'Update History' }}
-              />
-            </Stack.Navigator>
-          </NavigationContainer>
-        </BundleLoader>
+        <NavigationContainer>
+          <Stack.Navigator initialRouteName="Home">
+            <Stack.Screen 
+              name="Home" 
+              component={HomeScreen} 
+              options={{ title: 'CodePush Demo' }}
+            />
+            <Stack.Screen 
+              name="Settings" 
+              component={SettingsScreen} 
+              options={{ title: 'Settings' }}
+            />
+            <Stack.Screen 
+              name="UpdateHistory" 
+              component={UpdateHistoryScreen} 
+              options={{ title: 'Update History' }}
+            />
+            <Stack.Screen 
+              name="RuntimeBundle" 
+              component={RuntimeBundleScreen} 
+              options={{ title: 'Runtime Bundle' }}
+            />
+          </Stack.Navigator>
+        </NavigationContainer>
         {/* <UpdateChecker /> */}
       </CodePushProvider>
     </GestureHandlerRootView>

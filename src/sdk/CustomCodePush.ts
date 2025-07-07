@@ -47,6 +47,8 @@ export type DownloadProgressCallback = (progress: { receivedBytes: number; total
 class CustomCodePush {
   private config: CodePushConfiguration;
   private currentPackage: LocalPackage | null = null;
+  // Promise that resolves when directories are initialized and current package loaded
+  private readyPromise: Promise<void>;
   private pendingUpdate: UpdatePackage | null = null;
   private isCheckingForUpdate = false;
   private isDownloading = false;
@@ -70,8 +72,18 @@ class CustomCodePush {
       minimumBackgroundDuration: 0,
       ...config,
     };
-    this.initializeDirectories();
-    this.loadCurrentPackage();
+    // Initialize directories and load stored package before SDK use
+    this.readyPromise = (async () => {
+      await this.initializeDirectories();
+      await this.loadCurrentPackage();
+    })();
+  }
+
+  /**
+   * Wait for SDK initialization (directories + stored package loaded)
+   */
+  public async initialize(): Promise<void> {
+    return this.readyPromise;
   }
 
   private async initializeDirectories(): Promise<void> {

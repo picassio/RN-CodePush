@@ -10,10 +10,19 @@ import { useCodePush } from 'react-native-codepush-sdk';
 import HistoryItem from '../components/HistoryItem';
 
 const UpdateHistoryScreen: React.FC = () => {
-  const { currentUpdate, availableUpdate } = useCodePush();
+  const { currentUpdate } = useCodePush();
 
-  // Mock update history for now
-  const updateHistory = currentUpdate ? [currentUpdate] : [];
+  // Build update history entry from current local package
+  const updateHistory = currentUpdate
+    ? [{
+        id: currentUpdate.packageHash,
+        version: currentUpdate.label,
+        timestamp: currentUpdate.timestamp,
+        status: 'SUCCESS',
+        description: currentUpdate.description,
+        downloadSize: currentUpdate.packageSize,
+      }]
+    : [];
 
   const renderHistoryItem = ({ item }: { item: any }) => (
     <HistoryItem item={item} />
@@ -39,7 +48,7 @@ const UpdateHistoryScreen: React.FC = () => {
         <FlatList
           data={updateHistory}
           renderItem={renderHistoryItem}
-          keyExtractor={(item) => item.packageHash}
+          keyExtractor={(item) => item.id}
           style={styles.list}
           contentContainerStyle={styles.listContent}
         />

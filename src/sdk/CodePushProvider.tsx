@@ -41,11 +41,17 @@ export const CodePushProvider: React.FC<CodePushProviderProps> = ({
   const [isInstalling, setIsInstalling] = useState(false);
 
   useEffect(() => {
-    loadCurrentUpdate();
-    
-    if (autoCheck) {
-      checkForUpdate();
-    }
+    // Wait for SDK to initialize (load stored package) before updating state
+    codePush.initialize()
+      .then(async () => {
+        await loadCurrentUpdate();
+        if (autoCheck) {
+          await checkForUpdate();
+        }
+      })
+      .catch(error => {
+        console.error('Error initializing CodePush SDK:', error);
+      });
 
     // Set up app state listener for resume checks
     if (checkOnResume) {
@@ -90,7 +96,7 @@ export const CodePushProvider: React.FC<CodePushProviderProps> = ({
       const success = await codePush.sync(
         {
           installMode: 'ON_NEXT_RESTART',
-          mandatoryInstallMode: 'IMMEDIATE',
+          mandatoryInstallMode: 'ON_NEXT_RESTART',
         },
         (status) => {
           setSyncStatus(status);

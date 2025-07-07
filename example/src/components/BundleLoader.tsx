@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
 import { useCodePush } from 'react-native-codepush-sdk';
 import RNFS from 'react-native-fs';
 import { Platform } from 'react-native';
@@ -14,10 +14,28 @@ const BundleLoader: React.FC<BundleLoaderProps> = ({ children, fallback }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [bundleContent, setBundleContent] = useState<string | null>(null);
+  const [bundleModule, setBundleModule] = useState<any>(null);
 
+  // Whenever currentUpdate changes, load the bundle file
   useEffect(() => {
     loadBundle();
   }, [currentUpdate]);
+
+  useEffect(() => {
+    // Once the bundle code is loaded, evaluate it as a CommonJS module
+    if (bundleContent) {
+      try {
+        const moduleObj: any = { exports: {} };
+        // Wrap and execute bundle code
+        new Function('module', 'exports', bundleContent)(moduleObj, moduleObj.exports);
+        setBundleModule(moduleObj.exports);
+        console.log('✅ Bundle module evaluated');
+      } catch (err) {
+        console.error('Failed to evaluate bundle module:', err);
+        setBundleModule(null);
+      }
+    }
+  }, [bundleContent]);
 
   const loadBundle = async () => {
     if (!currentUpdate) {
@@ -53,40 +71,26 @@ const BundleLoader: React.FC<BundleLoaderProps> = ({ children, fallback }) => {
   };
 
   const executeBundle = () => {
-    if (!bundleContent) {
-      return children; // Use original bundle
+    // No update or still loading => render fallback children
+    if (!bundleModule) {
+      return children;
     }
-
-    try {
-      // In a real implementation, you would use a JavaScript engine
-      // to execute the bundle content. For now, we'll show a demo
-      console.log('🚀 Executing downloaded bundle...');
-      
-      // This is a placeholder for actual bundle execution
-      // In practice, you would need to:
-      // 1. Parse the bundle
-      // 2. Execute it in a controlled environment
-      // 3. Replace the current app content
-      
-      return (
-        <View style={styles.container}>
-          <Text style={styles.title}>🎉 Downloaded Bundle Executed!</Text>
-          <Text style={styles.subtitle}>Version: {currentUpdate?.label}</Text>
-          <Text style={styles.description}>{currentUpdate?.description}</Text>
-          <Text style={styles.bundleInfo}>
-            Bundle Size: {Math.round((bundleContent.length / 1024) * 100) / 100} KB
-          </Text>
-          <Text style={styles.note}>
-            Note: This is a demo. In a real implementation, the bundle would replace the entire app content.
-          </Text>
-        </View>
-      );
-      
-    } catch (err) {
-      console.error('❌ Failed to execute bundle:', err);
-      setError(err instanceof Error ? err.message : 'Bundle execution failed');
-      return fallback || children;
-    }
+    // Use the bundle's render output
+    const info = bundleModule.getInfo?.();
+    const output = bundleModule.render?.();
+    return (
+      <ScrollView style={styles.container}>
+        {info?.title && <Text style={styles.title}>{info.title}</Text>}
+        {info?.version && <Text style={styles.subtitle}>Version: {info.version}</Text>}
+        {info?.description && <Text style={styles.description}>{info.description}</Text>}
+        {Array.isArray(info?.features) && (
+          <Text style={styles.bundleInfo}>Features: {info.features.join(', ')}</Text>
+        )}
+        <View style={styles.divider} />
+        <Text style={styles.rawTitle}>Render Output:</Text>
+        <Text style={styles.rawText}>{JSON.stringify(output, null, 2)}</Text>
+      </ScrollView>
+    );
   };
 
   if (isLoading) {
@@ -114,12 +118,10 @@ const BundleLoader: React.FC<BundleLoaderProps> = ({ children, fallback }) => {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#f8f9fa',
-  },
+      flex: 1,
+      padding: 20,
+      backgroundColor: '#f8f9fa',
+    },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -143,6 +145,22 @@ const styles = StyleSheet.create({
     color: '#495057',
     marginBottom: 20,
   },
+  divider: {
+      height: 1,
+      backgroundColor: '#ccc',
+      marginVertical: 16,
+    },
+    rawTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      marginBottom: 8,
+      color: '#333',
+    },
+    rawText: {
+      fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+      fontSize: 12,
+      color: '#444',
+    },
   note: {
     fontSize: 12,
     color: '#6c757d',
