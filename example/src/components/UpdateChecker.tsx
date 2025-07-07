@@ -23,6 +23,11 @@ const UpdateChecker: React.FC = () => {
     clearUpdates,
   } = useCodePush();
 
+  // If an update is already installed, do not render the updater UI
+  if (currentUpdate) {
+    return null;
+  }
+
   const getStatusMessage = () => {
     if (isChecking) return 'Checking for updates...';
     if (isDownloading) return 'Downloading update...';
@@ -104,7 +109,7 @@ const UpdateChecker: React.FC = () => {
       </View>
 
       {/* Current Version Info */}
-      {currentUpdate && (
+      {/* {currentUpdate && (
         <View style={styles.infoCard}>
           <Text style={styles.cardTitle}>Current Version</Text>
           <Text style={styles.infoText}>Label: {currentUpdate.label}</Text>
@@ -115,7 +120,7 @@ const UpdateChecker: React.FC = () => {
             <Text style={styles.infoDescription}>{currentUpdate.description}</Text>
           )}
         </View>
-      )}
+      )} */}
 
       {/* Available Update Info */}
       {availableUpdate && (

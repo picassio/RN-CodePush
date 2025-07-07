@@ -70,10 +70,10 @@ let updatePackages = [
     isDisabled: false,
     isMandatory: true,
     rollout: 50,
-    downloadUrl: 'http://192.168.9.147:3000/demo-bundles/v1.0.2.js',
+    downloadUrl: 'http://192.168.9.147:3000/demo-bundles/real-android.js',
     size: 3072,
     packageHash: 'def456ghi789',
-    blobUrl: 'http://192.168.9.147:3000/demo-bundles/v1.0.2.js',
+    blobUrl: 'http://192.168.9.147:3000/demo-bundles/real-android.js',
     uploadTime: new Date().toISOString(),
     releasedBy: 'developer@example.com'
   }

@@ -40,7 +40,7 @@ const App: React.FC = () => {
             />
           </Stack.Navigator>
         </NavigationContainer>
-        {/* <UpdateChecker /> */}
+        <UpdateChecker />
       </CodePushProvider>
     </GestureHandlerRootView>
   );
