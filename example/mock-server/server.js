@@ -55,10 +55,10 @@ let updatePackages = [
     isDisabled: false,
     isMandatory: false,
     rollout: 100,
-    downloadUrl: 'http://192.168.9.147:3000/demo-bundles/v1.0.1.js',
+    downloadUrl: 'http://192.168.9.143:3000/demo-bundles/v1.0.1.js',
     size: 2048,
     packageHash: 'abc123def456',
-    blobUrl: 'http://192.168.9.147:3000/demo-bundles/v1.0.1.js',
+    blobUrl: 'http://192.168.9.143:3000/demo-bundles/v1.0.1.js',
     uploadTime: new Date().toISOString(),
     releasedBy: 'developer@example.com'
   },
@@ -70,10 +70,10 @@ let updatePackages = [
     isDisabled: false,
     isMandatory: true,
     rollout: 50,
-    downloadUrl: 'http://192.168.9.147:3000/demo-bundles/real-android.js',
+    downloadUrl: 'http://192.168.9.143:3000/demo-bundles/real-android.js',
     size: 3072,
     packageHash: 'def456ghi789',
-    blobUrl: 'http://192.168.9.147:3000/demo-bundles/real-android.js',
+    blobUrl: 'http://192.168.9.143:3000/demo-bundles/real-android.js',
     uploadTime: new Date().toISOString(),
     releasedBy: 'developer@example.com'
   }
@@ -203,5 +203,5 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 CodePush Mock Server running on port ${PORT}`);
   console.log(`📁 Serving files from: ${path.join(__dirname, 'uploads')}`);
   console.log(`🔗 Health check: http://localhost:${PORT}/health`);
-  console.log(`🌐 Network access: http://192.168.9.147:${PORT}/health`);
+  console.log(`🌐 Network access: http://192.168.9.143:${PORT}/health`);
 }); 

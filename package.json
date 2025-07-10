@@ -1,6 +1,6 @@
 {
   "name": "react-native-codepush-sdk",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A React Native CodePush SDK for over-the-air updates",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -9,7 +9,8 @@
     "dev": "cd example && npm run start",
     "test": "jest",
     "lint": "eslint .",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "publish": "npm publish --access public"
   },
   "keywords": [
     "react-native",
@@ -19,13 +20,19 @@
     "mobile",
     "SDK"
   ],
-  "author": "Your Name",
+  "author": "Bùi Sĩ Nam - hyper-mind.dev",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourusername/react-native-codepush-sdk.git"
+    "url": "git+https://github.com/picassio/RN-CodePush.git"
   },
-  "homepage": "https://github.com/yourusername/react-native-codepush-sdk#readme",
+  "homepage": "https://github.com/picassio/RN-CodePush#readme",
+  "bugs": {
+    "url": "https://github.com/picassio/RN-CodePush/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "peerDependencies": {
     "react": ">=16.8.0",
     "react-native": ">=0.60.0"
@@ -50,11 +57,12 @@
   },
   "files": [
     "dist/",
-    "src/",
+    "src/components/",
+    "src/sdk/",
+    "src/utils/",
     "types/",
     "services/",
     "hooks/",
-    "components/",
     "index.ts",
     "README.md",
     "LICENSE"
