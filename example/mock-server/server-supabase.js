@@ -7,7 +7,7 @@ const fs = require('fs');
 const { supabase } = require('./supabase');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3080;
 
 // Middleware
 app.use(cors());
