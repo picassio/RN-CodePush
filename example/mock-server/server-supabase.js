@@ -32,7 +32,7 @@ const upload = multer({ storage: storage });
 // --- API Endpoints ---
 
 // Get deployments for an application (by application_id)
-app.get('/v0.1/apps/:appId/deployments', async (req, res) => {
+app.get('/v1/apps/:appId/deployments', async (req, res) => {
   const { appId } = req.params;
   try {
     const { data, error } = await supabase
@@ -47,7 +47,7 @@ app.get('/v0.1/apps/:appId/deployments', async (req, res) => {
 });
 
 // Get deployment by name (for an application)
-app.get('/v0.1/apps/:appId/deployments/:deploymentName', async (req, res) => {
+app.get('/v1/apps/:appId/deployments/:deploymentName', async (req, res) => {
   const { appId, deploymentName } = req.params;
   try {
     const { data, error } = await supabase
@@ -64,7 +64,7 @@ app.get('/v0.1/apps/:appId/deployments/:deploymentName', async (req, res) => {
 });
 
 // Check for updates (main endpoint for SDK)
-app.post('/v0.1/public/codepush/update_check', async (req, res) => {
+app.post('/v1/public/codepush/update_check', async (req, res) => {
   const { deploymentKey, appVersion, packageHash, clientUniqueId, label } = req.body;
   console.log('POST /v0.1/public/codepush/update_check', req.body);
   try {
@@ -118,7 +118,7 @@ app.post('/v0.1/public/codepush/update_check', async (req, res) => {
 });
 
 // Report status
-app.post('/v0.1/public/codepush/report_status/deploy', async (req, res) => {
+app.post('/v1/public/codepush/report_status/deploy', async (req, res) => {
   const { deploymentKey, label, status, clientUniqueId } = req.body;
   console.log('POST /v0.1/public/codepush/report_status/deploy', req.body);
   
@@ -149,7 +149,7 @@ app.post('/v0.1/public/codepush/report_status/deploy', async (req, res) => {
   }
 });
 
-app.post('/v0.1/public/codepush/report_status/download', async (req, res) => {
+app.post('/v1/public/codepush/report_status/download', async (req, res) => {
   const { deploymentKey, label, clientUniqueId } = req.body;
   console.log('POST /v0.1/public/codepush/report_status/download', req.body);
   
@@ -181,7 +181,7 @@ app.post('/v0.1/public/codepush/report_status/download', async (req, res) => {
 });
 
 // Upload package
-app.post('/v0.1/apps/:appName/deployments/:deploymentName/release', upload.single('package'), async (req, res) => {
+app.post('/v1/apps/:appName/deployments/:deploymentName/release', upload.single('package'), async (req, res) => {
   const { appName, deploymentName } = req.params;
   const { label, description, mandatory, rollout } = req.body;
   const file = req.file;
