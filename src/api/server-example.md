@@ -4,19 +4,13 @@ This document describes the API endpoints your custom CodePush server should imp
 
 ## Base URL
 ```
-https://your-custom-codepush-server.com/api/v1
-```
-
-## Authentication
-All requests should include the deployment key in the Authorization header:
-```
-Authorization: Bearer YOUR_DEPLOYMENT_KEY
+https://your-custom-codepush-server.com
 ```
 
 ## Endpoints
 
 ### 1. Check for Updates
-**POST** `/updates/check`
+**POST** `/v1/public/codepush/update_check`
 
 Check if there's an available update for the client.
 
@@ -26,11 +20,8 @@ Check if there's an available update for the client.
   "deploymentKey": "your-deployment-key",
   "appVersion": "1.0.0",
   "packageHash": "current-package-hash-or-null",
-  "platform": "ios|android",
-  "platformVersion": "platform-version",
-  "deviceId": "unique-device-id",
-  "deviceModel": "device-model",
-  "currentPackageHash": "current-hash-or-null"
+  "clientUniqueId": "unique-device-id",
+  "label": "current-label-or-null"
 }
 ```
 
@@ -38,13 +29,12 @@ Check if there's an available update for the client.
 ```json
 {
   "updateInfo": {
-    "isAvailable": true,
     "packageHash": "new-package-hash",
     "label": "v1.0.1",
     "appVersion": "1.0.0",
     "description": "Bug fixes and improvements",
     "isMandatory": false,
-    "packageSize": 1048576,
+    "size": 1048576,
     "downloadUrl": "https://your-server.com/downloads/package-hash.zip",
     "rollout": 100,
     "isDisabled": false
@@ -55,14 +45,12 @@ Check if there's an available update for the client.
 **Response (No Update):**
 ```json
 {
-  "updateInfo": {
-    "isAvailable": false
-  }
+  "updateInfo": null
 }
 ```
 
-### 2. Report Installation
-**POST** `/updates/report`
+### 2. Report Deploy / Installation
+**POST** `/v1/public/codepush/report_status/deploy`
 
 Report the status of an update installation.
 
@@ -70,15 +58,9 @@ Report the status of an update installation.
 ```json
 {
   "deploymentKey": "your-deployment-key",
-  "packageHash": "installed-package-hash",
   "label": "v1.0.1",
-  "status": "INSTALLED|FAILED",
-  "timestamp": 1640995200000,
-  "platform": "ios|android",
-  "platformVersion": "platform-version",
-  "deviceId": "unique-device-id",
-  "deviceModel": "device-model",
-  "appVersion": "1.0.0"
+  "status": "Deployed|Failed|Rollback",
+  "clientUniqueId": "unique-device-id"
 }
 ```
 
@@ -89,22 +71,15 @@ Report the status of an update installation.
 }
 ```
 
-### 3. Report Rollback
-**POST** `/updates/rollback`
-
-Report when a user rolls back to a previous version.
+### 3. Report Download
+**POST** `/v1/public/codepush/report_status/download`
 
 **Request Body:**
 ```json
 {
   "deploymentKey": "your-deployment-key",
-  "packageHash": "rolled-back-package-hash",
-  "timestamp": 1640995200000,
-  "platform": "ios|android",
-  "platformVersion": "platform-version",
-  "deviceId": "unique-device-id",
-  "deviceModel": "device-model",
-  "appVersion": "1.0.0"
+  "label": "v1.0.1",
+  "clientUniqueId": "unique-device-id"
 }
 ```
 

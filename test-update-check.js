@@ -4,7 +4,7 @@ async function testUpdateCheck() {
   try {
     console.log('Testing CodePush update check...');
     
-    const response = await fetch('http://localhost:3000/v0.1/public/codepush/update_check', {
+    const response = await fetch('http://localhost:3000/api/v1/update_check', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -60,7 +60,7 @@ npm install
 npm run mock-server
 ```
 
-The mock server will run on `http://localhost:3000` and provide:
+The mock server will run on `http://localhost:3080` and provide:
 - Update checking endpoints
 - Package upload/download
 - Deployment management
@@ -104,7 +104,7 @@ The demo uses a configuration file at `config/codepush.config.ts`:
 
 ```typescript
 export const defaultConfig: CodePushConfig = {
-  serverUrl: 'http://localhost:3000',
+  serverUrl: 'http://localhost:3080',
   deploymentKey: 'production-key-123',
   appVersion: '1.0.0',
   autoDownload: true,
@@ -120,10 +120,9 @@ export const defaultConfig: CodePushConfig = {
 The included mock server provides a complete CodePush-compatible API:
 
 ### Endpoints
-- `GET /v0.1/apps/:appName/deployments` - List deployments
-- `POST /v0.1/public/codepush/update_check` - Check for updates
-- `POST /v0.1/public/codepush/report_status/deploy` - Report deployment status
-- `POST /v0.1/apps/:appName/deployments/:deploymentName/release` - Upload updates
+- `POST /v1/public/codepush/update_check` - Check for updates (Supabase-backed server)
+- `POST /v1/public/codepush/report_status/deploy` - Report deployment status
+- `POST /v1/public/codepush/report_status/download` - Report download status
 
 ### Testing Updates
 1. Start the mock server
@@ -140,7 +139,7 @@ The included mock server provides a complete CodePush-compatible API:
 4. Update configuration in `config/`
 
 ### Customizing the Mock Server
-Edit `mock-server/server.js` to:
+Edit `mock-server/server-supabase.js` to:
 - Add new endpoints
 - Modify update logic
 - Change deployment configurations

@@ -138,7 +138,7 @@ class CustomCodePush {
     try {
       const deviceInfo = await this.getDeviceInfo();
       
-      const response = await fetch(`${this.config.serverUrl}/v0.1/public/codepush/update_check`, {
+      const response = await fetch(`${this.config.serverUrl}/api/v1/update_check`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -320,7 +320,7 @@ class CustomCodePush {
     try {
       const deviceInfo = await this.getDeviceInfo();
       
-      await fetch(`${this.config.serverUrl}/v0.1/public/codepush/report_status/deploy`, {
+      await fetch(`${this.config.serverUrl}/api/v1/report_status/deploy`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -468,7 +468,7 @@ class CustomCodePush {
     try {
       const deviceInfo = await this.getDeviceInfo();
       
-      await fetch(`${this.config.serverUrl}/v0.1/public/codepush/report_status/deploy`, {
+      await fetch(`${this.config.serverUrl}/api/v1/report_status/deploy`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -143,13 +143,13 @@ if (update) {
 
 ## Server API
 
-The SDK calls these paths on your `serverUrl` (no base path prefix; the SDK uses the paths below as-is).
+The SDK calls these paths on your `serverUrl` (no trailing slash). In a typical dashboard setup (e.g. on Vercel), you would expose these as API routes:
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| POST | `/v0.1/public/codepush/update_check` | Check for an available update |
-| POST | `/v0.1/public/codepush/report_status/deploy` | Report install/deploy status |
-| POST | `/v0.1/public/codepush/report_status/download` | Report download status |
+| POST | `/api/v1/update_check` | Check for an available update |
+| POST | `/api/v1/report_status/deploy` | Report install/deploy/rollback status |
+| POST | `/api/v1/report_status/download` | Report download status |
 
 **update_check** request body (example):
 
@@ -168,7 +168,6 @@ The SDK calls these paths on your `serverUrl` (no base path prefix; the SDK uses
 ```json
 {
   "updateInfo": {
-    "isAvailable": true,
     "packageHash": "abc123",
     "label": "v1.0.1",
     "appVersion": "1.0.0",
@@ -184,7 +183,7 @@ The SDK calls these paths on your `serverUrl` (no base path prefix; the SDK uses
 
 When no update is available, return `updateInfo.isAvailable: false` or omit `updateInfo`.
 
-A full server example and request/response shapes are in the repo: see `example/mock-server/server.js` and `src/api/server-example.md`.
+A full server example and request/response shapes are in `src/api/server-example.md`. Implement those routes in your dashboard/backend (for example, as Vercel/Next.js API routes).
 
 ## Configuration
 
@@ -247,8 +246,8 @@ See `src/api/server-example.md` and `example/mock-server/` for package layout an
 ## Development and example app
 
 - **Example app**: `example/` is a React Native app that uses this SDK; run it with `cd example && npm start` (and start the mock server for updates).
-- **Mock server**: `example/mock-server/` implements the `/v0.1/public/codepush/*` endpoints. Use it to test update flow locally.
-- **Test script**: From the repo root, run `node test-update-check.js` (with the mock server on port 3000) to hit the update-check endpoint.
+- **Mock server**: `example/mock-server/` implements the `/v1/public/codepush/*` endpoints (Supabase-backed). Use it to test update flow locally.
+- **Test script**: From the repo root, run `node test-update-check.js` (with the mock server on port 3080) to hit the update-check endpoint.
 
 ```bash
 # Terminal 1 – mock server
