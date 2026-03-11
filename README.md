@@ -1,44 +1,46 @@
 # React Native CodePush SDK
 
-A comprehensive SDK for integrating CodePush-style over-the-air updates into your React Native apps, with support for custom servers and advanced update workflows.
+A React Native SDK for over-the-air (OTA) updates with support for your own backend. Use it to ship JS and asset updates without going through the app stores.
 
-> **Looking for a working demo app?**
-> See the `example/` folder for a full React Native project that consumes this SDK.
+- **Custom server**: Works with any server that implements the CodePush-style API.
+- **Unified API**: Same API on iOS and Android (provider, hook, or class-based).
+- **Optional demo**: See the `example/` app and `example/mock-server/` for a full setup.
 
 ## Features
 
-### 🚀 Core Functionality
-- **Custom Server Integration**: Connect to your own CodePush server
-- **Over-the-Air Updates**: Download and install app updates without app store releases
-- **Rollback Support**: Automatically rollback failed updates
-- **Progress Tracking**: Real-time download and installation progress
-- **Mandatory Updates**: Support for required updates that users cannot skip
+- **Custom server** – Point to your own update server (see [Server API](#server-api)).
+- **OTA updates** – Download and install JS bundles and assets without a store release.
+- **Rollback** – Revert to the previous bundle on failed install.
+- **Progress** – Download and install progress callbacks.
+- **Mandatory updates** – Optional forced updates.
+- **Install modes** – Immediate, on next restart, or on next resume.
+- **Gradual rollouts** – Server-side rollout percentage support.
 
-### 📱 Platform Support
-- **iOS**: Full native integration
-- **Android**: Complete Android support
-- **Cross-Platform**: Unified API for both platforms
+## Requirements
 
-### 🔧 Advanced Features
-- **Gradual Rollouts**: Support for percentage-based rollouts
-- **Update Validation**: Verify update integrity before installation
-- **Offline Support**: Handle updates when network is unavailable
-- **Background Downloads**: Download updates in the background
-- **Custom Install Modes**: Immediate, on restart, or on resume installation
+- React Native >= 0.60, React >= 16.8
+- Node >= 18 (for tooling)
 
 ## Installation
 
-### 1. Install Dependencies
+### 1. Install the package
+
+```bash
+npm install react-native-codepush-sdk
+```
+
+Peer dependencies (install if not already present):
 
 ```bash
 npm install react-native-fs react-native-zip-archive react-native-device-info @react-native-async-storage/async-storage
 ```
 
-### 2. Platform Setup
+### 2. Platform setup
 
-#### iOS Setup
-1. Run `cd ios && pod install`
-2. Add the following to your `Info.plist`:
+#### iOS
+
+1. Run `cd ios && pod install`.
+2. If your server uses HTTP (e.g. local dev), add to `Info.plist`:
 ```xml
 <key>NSAppTransportSecurity</key>
 <dict>
@@ -47,8 +49,9 @@ npm install react-native-fs react-native-zip-archive react-native-device-info @r
 </dict>
 ```
 
-#### Android Setup
-1. Add permissions to `android/app/src/main/AndroidManifest.xml`:
+#### Android
+
+Add to `android/app/src/main/AndroidManifest.xml`:
 ```xml
 <uses-permission android:name="android.permission.INTERNET" />
 <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
@@ -57,46 +60,48 @@ npm install react-native-fs react-native-zip-archive react-native-device-info @r
 
 ## Usage
 
-### Basic Setup
+App version is read from the device via `react-native-device-info`; you only configure `serverUrl`, `deploymentKey`, and `appName`.
+
+### Provider + component (recommended)
 
 ```tsx
 import React from 'react';
 import { SafeAreaView } from 'react-native';
-import { CodePushProvider } from './src/sdk/CodePushProvider';
-import UpdateChecker from './src/components/UpdateChecker';
+import { CodePushProvider, UpdateChecker } from 'react-native-codepush-sdk';
 
-const App: React.FC = () => {
-  const codePushConfig = {
-    serverUrl: 'https://your-custom-codepush-server.com',
-    deploymentKey: 'your-deployment-key-here',
-    appVersion: '1.0.0',
-    checkFrequency: 'ON_APP_START',
-    installMode: 'ON_NEXT_RESTART',
-  };
+const config = {
+  serverUrl: 'https://your-codepush-server.com',
+  deploymentKey: 'your-deployment-key',
+  appName: 'YourApp',
+  checkFrequency: 'ON_APP_START',
+  installMode: 'ON_NEXT_RESTART',
+  minimumBackgroundDuration: 0,
+};
 
+export default function App() {
   return (
-    <CodePushProvider config={codePushConfig} autoCheck={true}>
+    <CodePushProvider config={config} autoCheck checkOnResume>
       <SafeAreaView style={{ flex: 1 }}>
         <UpdateChecker />
       </SafeAreaView>
     </CodePushProvider>
   );
-};
-
-export default App;
+}
 ```
 
-### Using the Hook
+### useCodePush hook
 
 ```tsx
-import { useCodePush } from './src/sdk/CodePushProvider';
+import { View, Button } from 'react-native';
+import { useCodePush } from 'react-native-codepush-sdk';
 
-const MyComponent = () => {
+function MyScreen() {
   const {
     availableUpdate,
     isChecking,
     checkForUpdate,
     syncUpdate,
+    getBundleUrl,
   } = useCodePush();
 
   return (
@@ -104,175 +109,171 @@ const MyComponent = () => {
       {availableUpdate && (
         <Button title="Install Update" onPress={syncUpdate} />
       )}
-      <Button 
-        title="Check for Updates" 
+      <Button
+        title="Check for Updates"
         onPress={checkForUpdate}
         disabled={isChecking}
       />
     </View>
   );
-};
+}
 ```
 
-### Manual Integration
+### Class-based (CustomCodePush)
 
 ```tsx
-import CustomCodePush from './src/sdk/CustomCodePush';
+import { CustomCodePush } from 'react-native-codepush-sdk';
 
 const codePush = new CustomCodePush({
   serverUrl: 'https://your-server.com',
   deploymentKey: 'your-key',
-  appVersion: '1.0.0',
+  appName: 'YourApp',
 });
 
-// Check for updates
-const update = await codePush.checkForUpdate();
+await codePush.initialize();
 
-// Download and install
+const update = await codePush.checkForUpdate();
 if (update) {
   const localPackage = await codePush.downloadUpdate(update, (progress) => {
-    console.log(`Download progress: ${progress.receivedBytes}/${progress.totalBytes}`);
+    console.log(`${progress.receivedBytes}/${progress.totalBytes}`);
   });
-  
   await codePush.installUpdate(localPackage);
 }
 ```
 
-## Server Implementation
+## Server API
 
-Your custom CodePush server needs to implement these endpoints:
+The SDK calls these paths on your `serverUrl` (no base path prefix; the SDK uses the paths below as-is).
 
-### Check for Updates
-```
-POST /api/v1/updates/check
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | `/v0.1/public/codepush/update_check` | Check for an available update |
+| POST | `/v0.1/public/codepush/report_status/deploy` | Report install/deploy status |
+| POST | `/v0.1/public/codepush/report_status/download` | Report download status |
+
+**update_check** request body (example):
+
+```json
+{
+  "deploymentKey": "your-deployment-key",
+  "appVersion": "1.0.0",
+  "packageHash": null,
+  "clientUniqueId": "device-id",
+  "label": null
+}
 ```
 
-### Report Installation
-```
-POST /api/v1/updates/report
+**update_check** response when an update is available:
+
+```json
+{
+  "updateInfo": {
+    "isAvailable": true,
+    "packageHash": "abc123",
+    "label": "v1.0.1",
+    "appVersion": "1.0.0",
+    "description": "Bug fixes",
+    "isMandatory": false,
+    "size": 1048576,
+    "downloadUrl": "https://your-server.com/packages/abc123.zip",
+    "rollout": 100,
+    "isDisabled": false
+  }
+}
 ```
 
-### Report Rollback
-```
-POST /api/v1/updates/rollback
-```
+When no update is available, return `updateInfo.isAvailable: false` or omit `updateInfo`.
 
-See `src/api/server-example.md` for detailed API documentation.
+A full server example and request/response shapes are in the repo: see `example/mock-server/server.js` and `src/api/server-example.md`.
 
-## Configuration Options
+## Configuration
 
 ```typescript
 interface CodePushConfiguration {
-  serverUrl: string;                    // Your server URL
-  deploymentKey: string;                // Deployment key for authentication
-  appVersion: string;                   // Current app version
-  checkFrequency?: 'ON_APP_START' |     // When to check for updates
-                   'ON_APP_RESUME' | 
-                   'MANUAL';
-  installMode?: 'IMMEDIATE' |           // When to install updates
-                'ON_NEXT_RESTART' | 
-                'ON_NEXT_RESUME';
-  minimumBackgroundDuration?: number;   // Minimum background time before checking
+  serverUrl: string;           // Base URL of your update server (no trailing slash)
+  deploymentKey: string;       // Deployment key for this app/deployment
+  appName: string;             // App name (e.g. for server-side routing)
+  checkFrequency?: 'ON_APP_START' | 'ON_APP_RESUME' | 'MANUAL';  // default: 'ON_APP_START'
+  installMode?: 'IMMEDIATE' | 'ON_NEXT_RESTART' | 'ON_NEXT_RESUME';  // default: 'ON_NEXT_RESTART'
+  minimumBackgroundDuration?: number;  // default: 0 (seconds in background before resume check)
 }
 ```
 
 ## API Reference
 
-### CustomCodePush Class
+### Exports
 
-#### Methods
+- `CodePushProvider` – React context provider; wrap your app (or root screen) with it.
+- `useCodePush` – Hook to access update state and actions (must be used inside `CodePushProvider`).
+- `CustomCodePush` – Class for non-React or manual integration.
+- `UpdateChecker` – Optional UI component that shows update prompts.
+- `BundleManager` – Utility for bundle path and loading.
+- `codePushService` – Optional service layer (e.g. for deployment/history UIs).
+- `useFrameworkReady` – Hook to wait for framework/engine ready before loading bundles.
+- Types: `CodePushUpdate`, `CodePushDeployment`, `CodePushSyncStatus`, `CodePushConfiguration`, `UpdateHistory`, etc. (see `types/codepush.ts`).
 
-- `checkForUpdate()`: Check if an update is available
-- `downloadUpdate(update, progressCallback)`: Download an update package
-- `installUpdate(localPackage)`: Install a downloaded update
-- `sync(options, statusCallback, progressCallback)`: Complete sync process
-- `getCurrentPackage()`: Get current installed package info
-- `rollback()`: Rollback to previous version
-- `clearUpdates()`: Clear all downloaded updates
+### CustomCodePush
 
-### CodePushProvider Component
+- `initialize()`: Promise that resolves when SDK is ready (directories + stored package loaded).
+- `checkForUpdate()`: Returns `UpdatePackage | null`.
+- `downloadUpdate(update, progressCallback?)`: Returns `Promise<LocalPackage>`.
+- `installUpdate(localPackage)`: Install a downloaded update.
+- `sync(statusCallback?, progressCallback?)`: Check, download, and install in one flow.
+- `getCurrentPackage()`: Current installed package or null.
+- `getBundleUrl()`: URL/path to load the current bundle (e.g. for custom loaders).
+- `rollback()`: Rollback to the previous version.
+- `clearUpdates()`: Clear all downloaded updates.
 
-#### Props
+### CodePushProvider
 
-- `config`: CodePush configuration object
-- `autoCheck`: Automatically check for updates on app start
-- `checkOnResume`: Check for updates when app resumes
+- **config** (`CodePushConfiguration`): Required.
+- **autoCheck** (boolean, default `true`): Run a check on mount.
+- **checkOnResume** (boolean, default `true`): Run a check when app comes to foreground.
 
-### useCodePush Hook
+### useCodePush()
 
-#### Returns
+Returns: `codePush`, `currentUpdate`, `availableUpdate`, `syncStatus`, `isChecking`, `isDownloading`, `isInstalling`, `checkForUpdate`, `syncUpdate`, `rollback`, `clearUpdates`, `getBundleUrl`.
 
-- `codePush`: CustomCodePush instance
-- `currentUpdate`: Currently installed update info
-- `availableUpdate`: Available update info
-- `syncStatus`: Current sync status
-- `isChecking`: Whether checking for updates
-- `isDownloading`: Whether downloading an update
-- `isInstalling`: Whether installing an update
-- `checkForUpdate()`: Function to check for updates
-- `syncUpdate()`: Function to sync and install updates
-- `rollback()`: Function to rollback updates
-- `clearUpdates()`: Function to clear all updates
+## Update package format
 
-## Update Package Format
+The server should serve either:
 
-Update packages should be ZIP files with this structure:
+- **ZIP** – Standard CodePush-style package:
+  - `index.bundle` (main JS bundle), optional `index.bundle.map`, `assets/`, and `metadata.json`.
+- **Single JS file** – For simple/demo setups the SDK can also use a direct `.js` URL (e.g. mock server demo bundles).
 
+See `src/api/server-example.md` and `example/mock-server/` for package layout and metadata.
+
+## Development and example app
+
+- **Example app**: `example/` is a React Native app that uses this SDK; run it with `cd example && npm start` (and start the mock server for updates).
+- **Mock server**: `example/mock-server/` implements the `/v0.1/public/codepush/*` endpoints. Use it to test update flow locally.
+- **Test script**: From the repo root, run `node test-update-check.js` (with the mock server on port 3000) to hit the update-check endpoint.
+
+```bash
+# Terminal 1 – mock server
+cd example/mock-server && npm start
+
+# Terminal 2 – test update check
+node test-update-check.js
 ```
-package.zip
-├── index.bundle          # Main JavaScript bundle
-├── index.bundle.map      # Source map (optional)
-├── assets/              # Static assets
-│   ├── images/
-│   ├── fonts/
-│   └── ...
-└── metadata.json        # Package metadata
-```
 
-## Security Considerations
+## Security
 
-1. **HTTPS Only**: Always use HTTPS for your server
-2. **Authentication**: Validate deployment keys on server
-3. **Package Signing**: Consider signing update packages
-4. **Rate Limiting**: Implement rate limiting on your server
-5. **Rollback Protection**: Implement automatic rollback for failed updates
+- Prefer **HTTPS** for the update server.
+- Validate **deployment keys** and apply **rate limiting** on the server.
+- Consider **signed packages** and automatic **rollback** on failed installs.
 
 ## Troubleshooting
 
-### Common Issues
-
-1. **Network Errors**: Check server URL and network connectivity
-2. **Permission Errors**: Ensure file system permissions are granted
-3. **Bundle Errors**: Verify update package format and integrity
-4. **Installation Failures**: Check available storage space
-
-### Debug Mode
-
-Enable debug logging by setting:
-
-```typescript
-// Add to your configuration
-const config = {
-  // ... other config
-  debug: true,
-};
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+- **Network errors**: Confirm `serverUrl` and device connectivity (and ATS/cleartext if using HTTP).
+- **Permission errors**: Ensure storage permissions (e.g. Android manifest) are set.
+- **Bundle/install failures**: Check package format, integrity, and free space.
 
 ## License
 
-MIT License - see LICENSE file for details.
+MIT – see [LICENSE](LICENSE).
 
-## Support
+## Links
 
-For issues and questions:
-- Check the troubleshooting section
-- Review the server API documentation
-- Create an issue in the repository
+- [Repository](https://github.com/picassio/RN-CodePush) · [Issues](https://github.com/picassio/RN-CodePush/issues)

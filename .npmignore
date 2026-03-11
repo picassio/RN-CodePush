@@ -1,0 +1,45 @@
+# Development files
+example/
+node_modules/
+.git/
+.gitignore
+.bolt/
+
+# Build artifacts
+*.tsbuildinfo
+*.log
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test files
+__tests__/
+*.test.js
+*.test.ts
+*.test.tsx
+*.spec.js
+*.spec.ts
+*.spec.tsx
+test-update-check.js
+
+# Configuration files
+tsconfig.node.json
+babel.config.js
+metro.config.js
+jest.config.js
+.eslintrc*
+.prettierrc*
+
+# Documentation
+src/api/
+
+# Development scripts
+dev/
+scripts/ 
