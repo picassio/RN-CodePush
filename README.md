@@ -8,7 +8,7 @@ A React Native SDK for over-the-air (OTA) updates with support for your own back
 
 ## Features
 
-- **Custom server** – Point to your own update server (see [Server API](#server-api)).
+- **Custom server** – Point to your own update server (see [Backend](#backend-for-server-implementers)).
 - **OTA updates** – Download and install JS bundles and assets without a store release.
 - **Rollback** – Revert to the previous bundle on failed install.
 - **Progress** – Download and install progress callbacks.
@@ -139,49 +139,19 @@ if (update) {
 }
 ```
 
-## Server API
+## What you use and receive
 
-The SDK calls these paths on your `serverUrl` (no trailing slash). In a typical dashboard setup (e.g. on Vercel), you would expose these as API routes:
+**You configure:** `serverUrl`, `deploymentKey` (and optionally `installMode`, `checkFrequency`).
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| POST | `/api/v1/update_check` | Check for an available update |
-| POST | `/api/v1/report_status/deploy` | Report install/deploy/rollback status |
-| POST | `/api/v1/report_status/download` | Report download status |
+**You call:** `checkForUpdate()`, `syncUpdate()`, `rollback()`, `clearUpdates()`, `getBundleUrl()` (from `useCodePush()` or `CustomCodePush`).
 
-**update_check** request body (example):
+**You receive:** `availableUpdate` (when an update exists), `currentUpdate` (currently installed), `syncStatus`, `isChecking`, `isDownloading`, `isInstalling`. The SDK handles the rest (network calls, install, reporting) internally.
 
-```json
-{
-  "deploymentKey": "your-deployment-key",
-  "appVersion": "1.0.0",
-  "packageHash": null,
-  "clientUniqueId": "device-id",
-  "label": null
-}
-```
+---
 
-**update_check** response when an update is available:
+## Backend (for server implementers)
 
-```json
-{
-  "updateInfo": {
-    "packageHash": "abc123",
-    "label": "v1.0.1",
-    "appVersion": "1.0.0",
-    "description": "Bug fixes",
-    "isMandatory": false,
-    "size": 1048576,
-    "downloadUrl": "https://your-server.com/packages/abc123.zip",
-    "rollout": 100,
-    "isDisabled": false
-  }
-}
-```
-
-When no update is available, return `updateInfo.isAvailable: false` or omit `updateInfo`.
-
-A full server example and request/response shapes are in `src/api/server-example.md`. Implement those routes in your dashboard/backend (for example, as Vercel/Next.js API routes).
+Your server must expose these routes under `serverUrl` (e.g. on Vercel): `POST /api/v1/update_check`, `POST /api/v1/report_status/deploy`, `POST /api/v1/report_status/download`. The SDK calls them automatically. Request and response formats are documented in `src/api/server-example.md`.
 
 ## Configuration
 
@@ -197,15 +167,10 @@ interface CodePushConfiguration {
 
 ## Minimum API (core surface)
 
-To match a minimal CodePush-style flow you only need:
-
 - **Config:** `serverUrl`, `deploymentKey` (optional: `installMode`, `checkFrequency`).
 - **React:** `CodePushProvider` + `useCodePush()` (or class-based `CustomCodePush`).
-- **Flow:** `checkForUpdate()` → `downloadUpdate()` → `installUpdate()`, or a single `sync()`.
-- **State:** `getCurrentPackage()` / `getUpdateMetadata()`, `getBundleUrl()` for the bundle to load.
-- **Recovery:** `rollback()`.
-
-The SDK reports install/rollback via `report_status/deploy` and download via `report_status/download`.
+- **Call:** `checkForUpdate()`, then `syncUpdate()` (or `downloadUpdate` + `installUpdate`), and `getBundleUrl()` for the bundle to load.
+- **Get:** `getCurrentPackage()` / `getUpdateMetadata()`, and recovery via `rollback()`.
 
 ## Bundle loading
 
@@ -250,27 +215,12 @@ Returns: `codePush`, `currentUpdate`, `availableUpdate`, `syncStatus`, `isChecki
 
 ## Update package format
 
-The server should serve either:
-
-- **ZIP** – Standard CodePush-style package:
-  - `index.bundle` (main JS bundle), optional `index.bundle.map`, `assets/`, and `metadata.json`.
-- **Single JS file** – For simple/demo setups the SDK can also use a direct `.js` URL (e.g. mock server demo bundles).
-
-See `src/api/server-example.md` and `example/mock-server/` for package layout and metadata.
+The server serves a **ZIP** (with `index.bundle`, optional `assets/`, `metadata.json`) or a single **JS file**. Details and metadata layout: `src/api/server-example.md`.
 
 ## Development and example app
 
-- **Example app**: `example/` is a React Native app that uses this SDK; run it with `cd example && npm start` (and start the mock server for updates).
-- **Mock server**: `example/mock-server/` implements the `/v1/public/codepush/*` endpoints (Supabase-backed). Use it to test update flow locally.
-- **Test script**: From the repo root, run `node test-update-check.js` (with the mock server on port 3080) to hit the update-check endpoint.
-
-```bash
-# Terminal 1 – mock server
-cd example/mock-server && npm start
-
-# Terminal 2 – test update check
-node test-update-check.js
-```
+- **Example app**: `example/` uses this SDK; run with `cd example && npm start`. Point `serverUrl` at your own backend (e.g. dashboard on Vercel).
+- **Test script**: `node test-update-check.js` (with your backend running on the URL and port used in the script).
 
 ## Security
 
