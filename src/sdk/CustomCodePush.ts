@@ -7,7 +7,6 @@ import { Platform, NativeModules } from 'react-native';
 export interface CodePushConfiguration {
   serverUrl: string;
   deploymentKey: string;
-  appName: string;
   checkFrequency?: 'ON_APP_START' | 'ON_APP_RESUME' | 'MANUAL';
   installMode?: 'IMMEDIATE' | 'ON_NEXT_RESTART' | 'ON_NEXT_RESUME';
   minimumBackgroundDuration?: number;
@@ -232,9 +231,19 @@ class CustomCodePush {
           throw new Error('Downloaded JavaScript file is empty');
         }
       } else {
-        // For zip files, check exact size
-        if (fileStats.size !== updatePackage.packageSize) {
-          throw new Error('Downloaded file size mismatch');
+        // For zip files, require non-empty; allow tolerance (CDN/compression can vary)
+        if (fileStats.size <= 0) {
+          throw new Error('Downloaded file is empty');
+        }
+        if (updatePackage.packageSize > 0) {
+          const tolerance = 0.1;
+          const minSize = updatePackage.packageSize * (1 - tolerance);
+          const maxSize = updatePackage.packageSize * (1 + tolerance);
+          if (fileStats.size < minSize || fileStats.size > maxSize) {
+            console.warn(
+              `Download size ${fileStats.size} outside expected range [${minSize}, ${maxSize}]; proceeding anyway`
+            );
+          }
         }
       }
 
@@ -273,6 +282,8 @@ class CustomCodePush {
         `${CustomCodePush.UPDATE_METADATA_KEY}_${updatePackage.packageHash}`,
         JSON.stringify(localPackage)
       );
+
+      await this.logDownloadReport(updatePackage);
 
       return localPackage;
     } catch (error) {
@@ -313,6 +324,23 @@ class CustomCodePush {
       throw error;
     } finally {
       this.isInstalling = false;
+    }
+  }
+
+  private async logDownloadReport(updatePackage: UpdatePackage): Promise<void> {
+    try {
+      const deviceInfo = await this.getDeviceInfo();
+      await fetch(`${this.config.serverUrl}/api/v1/report_status/download`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deploymentKey: this.config.deploymentKey,
+          label: updatePackage.label,
+          clientUniqueId: deviceInfo.clientUniqueId,
+        }),
+      });
+    } catch (error) {
+      console.warn('Failed to report download status:', error);
     }
   }
 

@@ -26,7 +26,6 @@ export interface CodePushSyncStatus {
 }
 
 export interface CodePushConfiguration {
-  appName: string;
   deploymentKey: string;
   serverUrl: string;
   checkFrequency: 'ON_APP_START' | 'ON_APP_RESUME' | 'MANUAL';

@@ -4,7 +4,7 @@ A React Native SDK for over-the-air (OTA) updates with support for your own back
 
 - **Custom server**: Works with any server that implements the CodePush-style API.
 - **Unified API**: Same API on iOS and Android (provider, hook, or class-based).
-- **Optional demo**: See the `example/` app and `example/mock-server/` for a full setup.
+- **Optional demo**: See the `example/` app for a full setup.
 
 ## Features
 
@@ -60,7 +60,7 @@ Add to `android/app/src/main/AndroidManifest.xml`:
 
 ## Usage
 
-App version is read from the device via `react-native-device-info`; you only configure `serverUrl`, `deploymentKey`, and `appName`.
+App version is read from the device via `react-native-device-info`; you only configure `serverUrl` and `deploymentKey`.
 
 ### Provider + component (recommended)
 
@@ -72,7 +72,6 @@ import { CodePushProvider, UpdateChecker } from 'react-native-codepush-sdk';
 const config = {
   serverUrl: 'https://your-codepush-server.com',
   deploymentKey: 'your-deployment-key',
-  appName: 'YourApp',
   checkFrequency: 'ON_APP_START',
   installMode: 'ON_NEXT_RESTART',
   minimumBackgroundDuration: 0,
@@ -127,7 +126,6 @@ import { CustomCodePush } from 'react-native-codepush-sdk';
 const codePush = new CustomCodePush({
   serverUrl: 'https://your-server.com',
   deploymentKey: 'your-key',
-  appName: 'YourApp',
 });
 
 await codePush.initialize();
@@ -191,25 +189,42 @@ A full server example and request/response shapes are in `src/api/server-example
 interface CodePushConfiguration {
   serverUrl: string;           // Base URL of your update server (no trailing slash)
   deploymentKey: string;       // Deployment key for this app/deployment
-  appName: string;             // App name (e.g. for server-side routing)
   checkFrequency?: 'ON_APP_START' | 'ON_APP_RESUME' | 'MANUAL';  // default: 'ON_APP_START'
   installMode?: 'IMMEDIATE' | 'ON_NEXT_RESTART' | 'ON_NEXT_RESUME';  // default: 'ON_NEXT_RESTART'
   minimumBackgroundDuration?: number;  // default: 0 (seconds in background before resume check)
 }
 ```
 
+## Minimum API (core surface)
+
+To match a minimal CodePush-style flow you only need:
+
+- **Config:** `serverUrl`, `deploymentKey` (optional: `installMode`, `checkFrequency`).
+- **React:** `CodePushProvider` + `useCodePush()` (or class-based `CustomCodePush`).
+- **Flow:** `checkForUpdate()` → `downloadUpdate()` → `installUpdate()`, or a single `sync()`.
+- **State:** `getCurrentPackage()` / `getUpdateMetadata()`, `getBundleUrl()` for the bundle to load.
+- **Recovery:** `rollback()`.
+
+The SDK reports install/rollback via `report_status/deploy` and download via `report_status/download`.
+
+## Bundle loading
+
+Use **`getBundleUrl()`** from `useCodePush()` or `CustomCodePush.getBundleUrl()` as the single source of truth for the OTA bundle path (e.g. `file://.../index.bundle`). `BundleManager` is an optional utility for custom setups.
+
 ## API Reference
 
-### Exports
+### Core exports
 
 - `CodePushProvider` – React context provider; wrap your app (or root screen) with it.
 - `useCodePush` – Hook to access update state and actions (must be used inside `CodePushProvider`).
 - `CustomCodePush` – Class for non-React or manual integration.
-- `UpdateChecker` – Optional UI component that shows update prompts.
-- `BundleManager` – Utility for bundle path and loading.
-- `codePushService` – Optional service layer (e.g. for deployment/history UIs).
-- `useFrameworkReady` – Hook to wait for framework/engine ready before loading bundles.
-- Types: `CodePushUpdate`, `CodePushDeployment`, `CodePushSyncStatus`, `CodePushConfiguration`, `UpdateHistory`, etc. (see `types/codepush.ts`).
+- Types: `CodePushConfiguration`, `UpdatePackage`, `LocalPackage`, `SyncStatus`, plus `types/codepush` (`CodePushUpdate`, `CodePushDeployment`, `CodePushSyncStatus`, `UpdateHistory`, etc.).
+
+### Optional exports
+
+- `UpdateChecker` – UI component for update prompts and actions.
+- `BundleManager` – Utility for custom bundle paths (prefer `getBundleUrl()` for OTA).
+- `useFrameworkReady` – Hook for framework/engine ready (e.g. Hermes).
 
 ### CustomCodePush
 

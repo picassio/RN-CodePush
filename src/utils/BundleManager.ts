@@ -1,6 +1,11 @@
 import RNFS from 'react-native-fs';
 import { Platform } from 'react-native';
 
+/**
+ * Optional utility for custom bundle paths. For OTA updates, prefer using
+ * getBundleUrl() from useCodePush() or CustomCodePush.getBundleUrl() as the
+ * single source of truth for the current bundle to load.
+ */
 export class BundleManager {
   private static readonly ORIGINAL_BUNDLE_PATH = Platform.select({
     ios: `${RNFS.MainBundlePath}/main.jsbundle`,

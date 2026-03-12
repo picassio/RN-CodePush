@@ -1,6 +1,6 @@
 {
   "name": "react-native-codepush-sdk",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A React Native CodePush SDK for over-the-air updates",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -61,7 +61,6 @@
     "src/sdk/",
     "src/utils/",
     "types/",
-    "services/",
     "hooks/",
     "index.ts",
     "README.md",
