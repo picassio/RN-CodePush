@@ -10,14 +10,15 @@ https://your-custom-codepush-server.com
 ## Endpoints
 
 ### 1. Check for Updates
-**POST** `/v1/public/codepush/update_check`
+**POST** `/api/v1/update_check`
 
 Check if there's an available update for the client.
 
-**Request Body:**
+**Request Body:** (SDK sends these; `bundleId` is read from the device automatically and cannot be overridden. Validate `deploymentKey` + `bundleId` on the server.)
 ```json
 {
   "deploymentKey": "your-deployment-key",
+  "bundleId": "com.example.myapp",
   "appVersion": "1.0.0",
   "packageHash": "current-package-hash-or-null",
   "clientUniqueId": "unique-device-id",
@@ -50,7 +51,7 @@ Check if there's an available update for the client.
 ```
 
 ### 2. Report Deploy / Installation
-**POST** `/v1/public/codepush/report_status/deploy`
+**POST** `/api/v1/report_status/deploy`
 
 Report the status of an update installation.
 
@@ -58,6 +59,7 @@ Report the status of an update installation.
 ```json
 {
   "deploymentKey": "your-deployment-key",
+  "bundleId": "com.example.myapp",
   "label": "v1.0.1",
   "status": "Deployed|Failed|Rollback",
   "clientUniqueId": "unique-device-id"
@@ -72,12 +74,13 @@ Report the status of an update installation.
 ```
 
 ### 3. Report Download
-**POST** `/v1/public/codepush/report_status/download`
+**POST** `/api/v1/report_status/download`
 
 **Request Body:**
 ```json
 {
   "deploymentKey": "your-deployment-key",
+  "bundleId": "com.example.myapp",
   "label": "v1.0.1",
   "clientUniqueId": "unique-device-id"
 }
@@ -154,10 +157,11 @@ All endpoints should return appropriate HTTP status codes and error messages:
 
 ## Implementation Notes
 
-1. **Security**: Always validate deployment keys and implement rate limiting
-2. **Rollout**: Support gradual rollouts by checking device ID against rollout percentage
-3. **Caching**: Implement proper caching headers for download URLs
-4. **Logging**: Log all update checks and installations for analytics
-5. **Rollback**: Track failed installations and support automatic rollbacks
-6. **Compression**: Use gzip compression for API responses
-7. **CDN**: Use a CDN for serving update packages for better performance
+1. **Validation**: Validate `deploymentKey` and `bundleId` together (the deployment must be associated with that app bundle). Reject requests with an invalid or mismatched pair.
+2. **Security**: Implement rate limiting and use HTTPS.
+3. **Rollout**: Support gradual rollouts by checking device ID against rollout percentage.
+4. **Caching**: Implement proper caching headers for download URLs.
+5. **Logging**: Log all update checks and installations for analytics.
+6. **Rollback**: Track failed installations and support automatic rollbacks.
+7. **Compression**: Use gzip compression for API responses.
+8. **CDN**: Use a CDN for serving update packages for better performance.

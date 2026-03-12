@@ -3,6 +3,7 @@ import DeviceInfo from 'react-native-device-info';
 import RNFS from 'react-native-fs';
 import { unzip } from 'react-native-zip-archive';
 import { Platform, NativeModules } from 'react-native';
+import { BundleManager } from '../utils/BundleManager';
 
 export interface CodePushConfiguration {
   serverUrl: string;
@@ -115,7 +116,22 @@ class CustomCodePush {
     }
   }
 
-  private async getDeviceInfo(): Promise<any> {
+  private async getDeviceInfo(): Promise<{
+    platform: string;
+    platformVersion: string | number;
+    appVersion: string;
+    deviceId: string;
+    deviceModel: string;
+    clientUniqueId: string;
+    currentPackageHash: string | null;
+    bundleId: string;
+  }> {
+    let bundleId = '';
+    try {
+      bundleId = await DeviceInfo.getBundleId();
+    } catch {
+      // keep empty if unavailable
+    }
     return {
       platform: Platform.OS,
       platformVersion: Platform.Version,
@@ -124,6 +140,7 @@ class CustomCodePush {
       deviceModel: await DeviceInfo.getModel(),
       clientUniqueId: await DeviceInfo.getUniqueId(),
       currentPackageHash: this.currentPackage?.packageHash || null,
+      bundleId,
     };
   }
 
@@ -144,6 +161,7 @@ class CustomCodePush {
         },
         body: JSON.stringify({
           deploymentKey: this.config.deploymentKey,
+          bundleId: deviceInfo.bundleId,
           appVersion: deviceInfo.appVersion || '1.0.0',
           packageHash: this.currentPackage?.packageHash,
           clientUniqueId: deviceInfo.clientUniqueId,
@@ -308,6 +326,9 @@ class CustomCodePush {
         throw new Error('Bundle file not found in update package');
       }
 
+      // Copy to current.bundle for native side to load
+      await BundleManager.installBundle(localPackage.localPath);
+
       // Mark as current package
       await this.saveCurrentPackage(localPackage);
 
@@ -335,6 +356,7 @@ class CustomCodePush {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           deploymentKey: this.config.deploymentKey,
+          bundleId: deviceInfo.bundleId,
           label: updatePackage.label,
           clientUniqueId: deviceInfo.clientUniqueId,
         }),
@@ -355,6 +377,7 @@ class CustomCodePush {
         },
         body: JSON.stringify({
           deploymentKey: this.config.deploymentKey,
+          bundleId: deviceInfo.bundleId,
           label: localPackage.label,
           status: success ? 'Deployed' : 'Failed',
           clientUniqueId: deviceInfo.clientUniqueId,
@@ -503,6 +526,7 @@ class CustomCodePush {
         },
         body: JSON.stringify({
           deploymentKey: this.config.deploymentKey,
+          bundleId: deviceInfo.bundleId,
           label: this.currentPackage?.label || 'unknown',
           status: 'Rollback',
           clientUniqueId: deviceInfo.clientUniqueId,

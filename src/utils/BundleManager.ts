@@ -60,13 +60,31 @@ export class BundleManager {
       const assetsDestPath = `${bundleDir}/assets`;
       
       if (await RNFS.exists(assetsSourcePath)) {
-        // Custom folder copy implementation needed here. For now, this is a placeholder.
-        // TODO: Implement folder copy logic or use a third-party utility.
+        if (await RNFS.exists(assetsDestPath)) {
+          await RNFS.unlink(assetsDestPath);
+        }
+        await BundleManager.copyRecursive(assetsSourcePath, assetsDestPath);
       }
 
     } catch (error) {
       console.error('Failed to install bundle:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Helper to recursively copy directories/files
+   */
+  private static async copyRecursive(src: string, dest: string): Promise<void> {
+    const stats = await RNFS.stat(src);
+    if (stats.isDirectory()) {
+      await RNFS.mkdir(dest);
+      const items = await RNFS.readDir(src);
+      for (const item of items) {
+        await BundleManager.copyRecursive(item.path, `${dest}/${item.name}`);
+      }
+    } else {
+      await RNFS.copyFile(src, dest);
     }
   }
 
