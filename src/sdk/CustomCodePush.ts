@@ -217,28 +217,46 @@ class CustomCodePush {
       // Check if it's a JavaScript file (demo bundles)
       const isJsFile = updatePackage.downloadUrl.endsWith('.js');
       const fileExtension = isJsFile ? 'js' : 'zip';
-      const downloadPath = `${CustomCodePush.DOWNLOADS_FOLDER}/${updatePackage.packageHash}.${fileExtension}`;
+      let downloadPath = `${CustomCodePush.DOWNLOADS_FOLDER}/${updatePackage.packageHash}.${fileExtension}`;
       
       // Clean up any existing download
       if (await RNFS.exists(downloadPath)) {
         await RNFS.unlink(downloadPath);
       }
 
-      const downloadResult = await RNFS.downloadFile({
-        fromUrl: updatePackage.downloadUrl,
-        toFile: downloadPath,
-        progress: (res) => {
-          if (progressCallback) {
-            progressCallback({
-              receivedBytes: res.bytesWritten,
-              totalBytes: res.contentLength,
-            });
-          }
-        },
-      }).promise;
+      if (updatePackage.downloadUrl.startsWith('/')) {
+        // Local file path
+        console.log('Using local file for update:', updatePackage.downloadUrl);
+        if (!(await RNFS.exists(updatePackage.downloadUrl))) {
+          throw new Error(`Local update file not found: ${updatePackage.downloadUrl}`);
+        }
+        await RNFS.copyFile(updatePackage.downloadUrl, downloadPath);
+        
+        // Mock progress for local copy
+        if (progressCallback) {
+          const stats = await RNFS.stat(downloadPath);
+          progressCallback({
+            receivedBytes: stats.size,
+            totalBytes: stats.size,
+          });
+        }
+      } else {
+        const downloadResult = await RNFS.downloadFile({
+          fromUrl: updatePackage.downloadUrl,
+          toFile: downloadPath,
+          progress: (res) => {
+            if (progressCallback) {
+              progressCallback({
+                receivedBytes: res.bytesWritten,
+                totalBytes: res.contentLength,
+              });
+            }
+          },
+        }).promise;
 
-      if (downloadResult.statusCode !== 200) {
-        throw new Error(`Download failed with status ${downloadResult.statusCode}`);
+        if (downloadResult.statusCode !== 200) {
+          throw new Error(`Download failed with status ${downloadResult.statusCode}`);
+        }
       }
 
       // Verify file size (approximate for JS files)
@@ -537,15 +555,17 @@ class CustomCodePush {
     }
   }
 
-  private restartApp(): void {
-    // In a real implementation, you would use a native module to restart the app
-    // For now, we'll just reload the React Native bundle
-    if (Platform.OS === 'android') {
-      // Android restart implementation
-      NativeModules.DevSettings?.reload();
-    } else {
-      // iOS restart implementation
-      NativeModules.DevSettings?.reload();
+  public restartApp(): void {
+    try {
+      const RNRestart = require('react-native-restart').default;
+      RNRestart.Restart();
+    } catch (e) {
+      console.warn("Failed to restart using react-native-restart, falling back to DevSettings", e);
+      if (Platform.OS === 'android') {
+        NativeModules.DevSettings?.reload();
+      } else {
+        NativeModules.DevSettings?.reload();
+      }
     }
   }
 

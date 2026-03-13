@@ -175,55 +175,58 @@ interface CodePushConfiguration {
 
 ## Bundle loading
 
-Use **`getBundleUrl()`** from `useCodePush()` or `CustomCodePush.getBundleUrl()` as the single source of truth for the OTA bundle path (e.g. `file://.../index.bundle`). `BundleManager` is an optional utility for custom setups.
+Use **`getBundleUrl()`** from `useCodePush()` or `CustomCodePush.getBundleUrl()` for the OTA bundle path. The SDK stores updates under a hash-based path; **`BundleManager.installBundle(sourcePath)`** copies the active bundle to `CustomCodePush/current.bundle` so native can load it on next launch.
 
-### Expo / native entrypoint configuration (Bare / custom dev client)
+To load that file at app start you must configure the **native JS bundle entrypoint** (Bare workflow or Expo custom dev client). The following config is based on the working example in this repo (`example/AppDelegate.swift`, `example/MainApplication.kt`).
 
-If you are using **Expo managed** (no native iOS/Android projects), you typically cannot swap the JS bundle entrypoint at runtime, so installing an update won't change the running code.
+### Native config (iOS)
 
-To load a downloaded bundle at app start you need a **native entrypoint** that checks for a local file and uses it as the JS bundle. This requires **Bare workflow** or an **Expo custom dev client**.
-
-This SDK includes `BundleManager.installBundle(sourcePath)` which copies the installed update's `index.bundle` to:
-
-- iOS/Android path: `DocumentDirectory/CustomCodePush/current.bundle`
-
-Then configure native entrypoints to load that file when it exists.
-
-#### iOS (Swift)
-
-In your `AppDelegate`, override the bundle URL:
+Use a delegate that overrides `bundleURL()` and prefers `CustomCodePush/current.bundle` when it exists and is not empty (so you can test OTA in Debug too):
 
 ```swift
 override func bundleURL() -> URL? {
-#if DEBUG
-  return RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: ".expo/.virtual-metro-entry")
-#else
   let fileManager = FileManager.default
   let documentsDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
   let customBundleURL = documentsDirectory.appendingPathComponent("CustomCodePush/current.bundle")
 
-  if fileManager.fileExists(atPath: customBundleURL.path) {
+  var isDirectory: ObjCBool = false
+  let exists = fileManager.fileExists(atPath: customBundleURL.path, isDirectory: &isDirectory)
+  let isNotEmpty = (try? fileManager.attributesOfItem(atPath: customBundleURL.path)[.size] as? Int64 ?? 0) ?? 0 > 0
+
+  if exists && !isDirectory.boolValue && isNotEmpty {
     return customBundleURL
   }
+
+#if DEBUG
+  return RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: ".expo/.virtual-metro-entry")
+#else
   return Bundle.main.url(forResource: "main", withExtension: "jsbundle")
 #endif
 }
 ```
 
-#### Android (Kotlin)
+(With Expo, implement this in your `ExpoReactNativeFactoryDelegate` subclass and return it from `sourceURL(for:)` as `bridge.bundleURL ?? bundleURL()`.)
 
-In your `ReactNativeHost`, override `getJSBundleFile()`:
+### Native config (Android)
+
+In your `ReactNativeHost`, override `getJSBundleFile()` and optionally `getUseDeveloperSupport()` so a valid OTA bundle is used even in debug:
 
 ```kotlin
 override fun getJSBundleFile(): String? {
   val file = File(applicationContext.filesDir, "CustomCodePush/current.bundle")
-  return if (file.exists()) file.absolutePath else super.getJSBundleFile()
+  return if (file.exists() && file.length() > 0) file.absolutePath else super.getJSBundleFile()
+}
+
+override fun getUseDeveloperSupport(): Boolean {
+  val file = File(applicationContext.filesDir, "CustomCodePush/current.bundle")
+  val exists = file.exists() && file.length() > 0
+  return if (exists) false else BuildConfig.DEBUG
 }
 ```
 
-#### After download + install
+### After download + install
 
-If you use the `current.bundle` native entrypoint above, make sure your app copies the bundle there after install:
+Copy the installed update to `current.bundle` so the native entrypoint loads it on next launch:
 
 ```ts
 import { BundleManager } from 'react-native-codepush-sdk';
@@ -231,6 +234,8 @@ import { BundleManager } from 'react-native-codepush-sdk';
 // After installUpdate(localPackage)
 await BundleManager.installBundle(localPackage.localPath);
 ```
+
+See the `example/` app for full iOS and Android setup.
 
 ## API Reference
 

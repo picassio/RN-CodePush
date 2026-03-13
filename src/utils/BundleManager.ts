@@ -12,7 +12,9 @@ export class BundleManager {
     android: 'assets://index.android.bundle',
   });
 
-  private static readonly CUSTOM_BUNDLE_PATH = `${RNFS.DocumentDirectoryPath}/CustomCodePush/current.bundle`;
+  private  static readonly CUSTOM_BUNDLE_PATH = Platform.OS === 'android' 
+    ? `${RNFS.DocumentDirectoryPath}/CustomCodePush/current.bundle`
+    : `${RNFS.DocumentDirectoryPath}/CustomCodePush/current.bundle`;
 
   /**
    * Get the path to the current bundle that should be loaded
@@ -51,19 +53,32 @@ export class BundleManager {
         BundleManager.CUSTOM_BUNDLE_PATH.lastIndexOf('/')
       );
       await RNFS.mkdir(bundleDir);
+      
+      if (await RNFS.exists(BundleManager.CUSTOM_BUNDLE_PATH)) {
+        await RNFS.unlink(BundleManager.CUSTOM_BUNDLE_PATH);
+      }
 
       // Copy bundle
       await RNFS.copyFile(bundlePath, BundleManager.CUSTOM_BUNDLE_PATH);
 
-      // Copy assets if they exist
-      const assetsSourcePath = `${sourcePath}/assets`;
-      const assetsDestPath = `${bundleDir}/assets`;
-      
-      if (await RNFS.exists(assetsSourcePath)) {
-        if (await RNFS.exists(assetsDestPath)) {
-          await RNFS.unlink(assetsDestPath);
+      // Copy all other files and directories (Assets, drawable-*, raw, etc.)
+      const items = await RNFS.readDir(sourcePath);
+      for (const item of items) {
+        // Skip the main bundle file and metadata
+        if (item.name === 'index.bundle' || item.name === 'metadata.json' || item.name.endsWith('.map')) {
+          continue;
         }
-        await BundleManager.copyRecursive(assetsSourcePath, assetsDestPath);
+
+        const destPath = `${bundleDir}/${item.name}`;
+        if (await RNFS.exists(destPath)) {
+          await RNFS.unlink(destPath);
+        }
+
+        if (item.isDirectory()) {
+          await BundleManager.copyRecursive(item.path, destPath);
+        } else {
+          await RNFS.copyFile(item.path, destPath);
+        }
       }
 
     } catch (error) {
