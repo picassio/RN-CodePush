@@ -157,8 +157,13 @@ Your server must expose these routes under `serverUrl` (e.g. on Vercel): `POST /
 
 ```typescript
 interface CodePushConfiguration {
-  serverUrl: string;           // Base URL of your update server (no trailing slash)
-  deploymentKey: string;       // Deployment key for this app/deployment
+  serverUrl?: string;           // Base URL of your update server (no trailing slash)
+  deploymentKey?: string;       // Deployment key for this app/deployment
+  /**
+   * Optional URL to a small JSON manifest that describes the latest bundle
+   * (for ZIP+manifest mode, e.g. large/social apps).
+   */
+  manifestUrl?: string;
   checkFrequency?: 'ON_APP_START' | 'ON_APP_RESUME' | 'MANUAL';  // default: 'ON_APP_START'
   installMode?: 'IMMEDIATE' | 'ON_NEXT_RESTART' | 'ON_NEXT_RESUME';  // default: 'ON_NEXT_RESTART'
   minimumBackgroundDuration?: number;  // default: 0 (seconds in background before resume check)
@@ -273,6 +278,128 @@ See the `example/` app for full iOS and Android setup.
 ### useCodePush()
 
 Returns: `codePush`, `currentUpdate`, `availableUpdate`, `syncStatus`, `isChecking`, `isDownloading`, `isInstalling`, `checkForUpdate`, `syncUpdate`, `rollback`, `clearUpdates`, `getBundleUrl`.
+
+## ZIP + manifest mode (for large / social apps)
+
+In addition to the classic CodePush-style API (`/update_check`), the SDK supports a **ZIP + manifest** mode.
+This is useful when you host a single large bundle (e.g. for a social app) and want clients to decide
+“new version or not” from a tiny JSON manifest, without downloading the ZIP on every check.
+
+### Manifest format
+
+Host a small JSON file (for example at `https://your-server.com/codepush/manifest.json`):
+
+```json
+{
+  "packageHash": "abc123def456",
+  "zipBundleUrl": "https://your-server.com/codepush/bundles/app-abc123def456.zip",
+  "size": 104857600
+}
+```
+
+- `packageHash`: logical version / hash of the OTA bundle.
+- `zipBundleUrl`: public URL of the ZIP bundle (can be large, e.g. 1 GB).
+- `size` (optional): used for progress UI and basic size checks.
+
+### Generating `manifest.json` in your build/CI
+
+You usually generate the manifest as part of your bundle/ZIP build step. One simple approach
+with Node is:
+
+```bash
+# 1. Build your JS bundle and assets (example for React Native)
+react-native bundle \
+  --platform android \
+  --dev false \
+  --entry-file index.js \
+  --bundle-output dist/index.bundle \
+  --assets-dest dist/assets
+
+cd dist
+zip -r app.zip index.bundle assets
+```
+
+Then a small Node script:
+
+```js
+// build-manifest.mjs
+import fs from 'fs';
+import crypto from 'crypto';
+import path from 'path';
+
+const distDir = 'dist';
+const bundlePath = path.join(distDir, 'index.bundle');
+const zipName = 'app.zip';
+const zipUrl = 'https://your-server.com/codepush/' + zipName;
+
+const bundleContent = fs.readFileSync(bundlePath);
+const packageHash = crypto
+  .createHash('sha256')
+  .update(bundleContent)
+  .digest('hex');
+
+const stats = fs.statSync(path.join(distDir, zipName));
+
+const manifest = {
+  packageHash,
+  zipBundleUrl: zipUrl,
+  size: stats.size,
+};
+
+fs.writeFileSync(
+  path.join(distDir, 'manifest.json'),
+  JSON.stringify(manifest, null, 2),
+  'utf8'
+);
+console.log('Manifest written to dist/manifest.json');
+```
+
+Run this in CI after the bundle/ZIP is built:
+
+```bash
+node build-manifest.mjs
+# Upload dist/app.zip and dist/manifest.json to your server / CDN
+```
+
+You can adapt the hashing scheme (e.g. include assets or use a git commit hash) as long as
+`packageHash` stays stable for a given bundle and changes when you release a new version.
+
+### Using CustomCodePush with a manifest
+
+You can keep `serverUrl` / `deploymentKey` for the classic API, or omit them if you only use
+the manifest-based flow. On app startup (or whenever you want to check), call:
+
+```ts
+import CustomCodePush from 'react-native-codepush-sdk';
+
+const codePush = new CustomCodePush({
+  // Optional: serverUrl / deploymentKey for classic mode.
+  // Optional: manifestUrl if you want to store it in config.
+  manifestUrl: EnvConfig.codePushManifestUrl,
+  installMode: 'ON_NEXT_RESTART',
+});
+
+await codePush.initialize();
+
+const result = await codePush.checkAndInstallFromManifest({
+  manifestUrl: EnvConfig.codePushManifestUrl,
+  installMode: 'ON_NEXT_RESTART', // or 'IMMEDIATE' / 'ON_NEXT_RESUME'
+});
+
+console.log('Has new version:', result.hasNewVersion);
+console.log('Installed hash:', result.installedHash);
+console.log('Latest hash:', result.latestHash);
+```
+
+`checkAndInstallFromManifest` will:
+
+- Fetch the manifest (small JSON).
+- Compare `manifest.packageHash` with the currently installed `packageHash`.
+- Download and install the ZIP from `zipBundleUrl` **only when the hash changes**.
+- Treat “no current package hash” as **first install** and install once.
+
+This design works well for **social-style apps** or any scenario where you distribute one large bundle,
+minimize per-launch network traffic, and still get OTA behavior.
 
 ## Update package format
 

@@ -6,8 +6,14 @@ import { Platform, NativeModules } from 'react-native';
 import { BundleManager } from '../utils/BundleManager';
 
 export interface CodePushConfiguration {
-  serverUrl: string;
-  deploymentKey: string;
+  serverUrl?: string;
+  deploymentKey?: string;
+  /**
+   * Optional URL to a small JSON manifest that describes the latest bundle
+   * (e.g. for ZIP+manifest mode in social/large apps).
+   * This is not used automatically; see checkAndInstallFromManifest.
+   */
+  manifestUrl?: string;
   checkFrequency?: 'ON_APP_START' | 'ON_APP_RESUME' | 'MANUAL';
   installMode?: 'IMMEDIATE' | 'ON_NEXT_RESTART' | 'ON_NEXT_RESUME';
   minimumBackgroundDuration?: number;
@@ -368,6 +374,10 @@ class CustomCodePush {
 
   private async logDownloadReport(updatePackage: UpdatePackage): Promise<void> {
     try {
+      if (!this.config.serverUrl || !this.config.deploymentKey) {
+        // No reporting backend configured (e.g. ZIP+manifest-only usage)
+        return;
+      }
       const deviceInfo = await this.getDeviceInfo();
       await fetch(`${this.config.serverUrl}/api/v1/report_status/download`, {
         method: 'POST',
@@ -386,6 +396,10 @@ class CustomCodePush {
 
   private async logUpdateInstallation(localPackage: LocalPackage, success: boolean): Promise<void> {
     try {
+      if (!this.config.serverUrl || !this.config.deploymentKey) {
+        // No reporting backend configured (e.g. ZIP+manifest-only usage)
+        return;
+      }
       const deviceInfo = await this.getDeviceInfo();
       
       await fetch(`${this.config.serverUrl}/api/v1/report_status/deploy`, {
@@ -535,6 +549,10 @@ class CustomCodePush {
 
   private async logRollback(): Promise<void> {
     try {
+      if (!this.config.serverUrl || !this.config.deploymentKey) {
+        // No reporting backend configured (e.g. ZIP+manifest-only usage)
+        return;
+      }
       const deviceInfo = await this.getDeviceInfo();
       
       await fetch(`${this.config.serverUrl}/api/v1/report_status/deploy`, {
@@ -592,6 +610,99 @@ class CustomCodePush {
     downloadProgressCallback?: DownloadProgressCallback
   ): Promise<boolean> {
     return instance.sync(options, statusCallback, downloadProgressCallback);
+  }
+
+  /**
+   * ZIP + manifest mode: fetch a small JSON manifest that describes the latest
+   * bundle, compare its packageHash with the currently installed one, and
+   * download + install the ZIP only when it differs.
+   *
+   * The manifest is expected to look like:
+   * {
+   *   "packageHash": "abc123",
+   *   "zipBundleUrl": "https://.../bundle_abc123.zip",
+   *   "size": 104857600
+   * }
+   */
+  public async checkAndInstallFromManifest(options: {
+    manifestUrl: string;
+    installMode?: 'IMMEDIATE' | 'ON_NEXT_RESTART' | 'ON_NEXT_RESUME';
+  }): Promise<{
+    hasNewVersion: boolean;
+    installedHash: string | null;
+    latestHash: string;
+  }> {
+    // Ensure directories and stored package are ready
+    await this.initialize();
+
+    const response = await fetch(options.manifestUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch manifest: HTTP ${response.status} ${response.statusText}`);
+    }
+
+    const manifest = await response.json() as {
+      packageHash?: string;
+      zipBundleUrl?: string;
+      size?: number;
+      [key: string]: any;
+    };
+
+    if (!manifest.packageHash || !manifest.zipBundleUrl) {
+      throw new Error('Invalid manifest: missing packageHash or zipBundleUrl');
+    }
+
+    const latestHash = manifest.packageHash;
+    const downloadUrl = manifest.zipBundleUrl;
+    const packageSize = typeof manifest.size === 'number' ? manifest.size : 0;
+
+    const installedHash = this.currentPackage?.packageHash || null;
+    const isFirstInstall = !installedHash;
+    const isSameVersion = !!installedHash && installedHash === latestHash;
+
+    if (!isFirstInstall && isSameVersion) {
+      // Already on the latest OTA version
+      return { hasNewVersion: false, installedHash, latestHash };
+    }
+
+    const deviceInfo = await this.getDeviceInfo();
+
+    const updatePackage: UpdatePackage = {
+      packageHash: latestHash,
+      // Use hash prefix as a simple label when coming from manifest-only flow
+      label: latestHash.slice(0, 7),
+      appVersion: deviceInfo.appVersion || '1.0.0',
+      description: '',
+      isMandatory: false,
+      packageSize,
+      downloadUrl,
+      timestamp: Date.now(),
+    };
+
+    const localPackage = await this.downloadUpdate(updatePackage);
+    await this.installUpdate(localPackage);
+
+    const finalInstallMode =
+      options.installMode || this.config.installMode || 'ON_NEXT_RESTART';
+
+    if (finalInstallMode === 'IMMEDIATE') {
+      this.restartApp();
+    }
+
+    return { hasNewVersion: true, installedHash, latestHash };
+  }
+
+  public static async checkAndInstallFromManifest(
+    instance: CustomCodePush,
+    options: {
+      manifestUrl: string;
+      installMode?: 'IMMEDIATE' | 'ON_NEXT_RESTART' | 'ON_NEXT_RESUME';
+    }
+  ): Promise<{
+    hasNewVersion: boolean;
+    installedHash: string | null;
+    latestHash: string;
+  }> {
+    return instance.checkAndInstallFromManifest(options);
   }
 }
 
