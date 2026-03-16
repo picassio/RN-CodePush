@@ -7,7 +7,10 @@ import { BundleManager } from '../utils/BundleManager';
 
 export interface CodePushConfiguration {
   serverUrl?: string;
-  deploymentKey?: string;
+  /** Deployment key for iOS (e.g. from CMS dashboard). */
+  deploymentKeyIOS?: string;
+  /** Deployment key for Android (e.g. from CMS dashboard). */
+  deploymentKeyAndroid?: string;
   /**
    * Optional URL to a small JSON manifest that describes the latest bundle
    * (e.g. for ZIP+manifest mode in social/large apps).
@@ -83,6 +86,16 @@ class CustomCodePush {
       await this.initializeDirectories();
       await this.loadCurrentPackage();
     })();
+  }
+
+  /**
+   * Effective deployment key for the current platform (iOS or Android key from config).
+   */
+  private getDeploymentKey(): string | undefined {
+    if (Platform.OS === 'ios') {
+      return this.config.deploymentKeyIOS;
+    }
+    return this.config.deploymentKeyAndroid;
   }
 
   /**
@@ -166,7 +179,7 @@ class CustomCodePush {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          deploymentKey: this.config.deploymentKey,
+          deploymentKey: this.getDeploymentKey(),
           bundleId: deviceInfo.bundleId,
           appVersion: deviceInfo.appVersion || '1.0.0',
           packageHash: this.currentPackage?.packageHash,
@@ -230,13 +243,19 @@ class CustomCodePush {
         await RNFS.unlink(downloadPath);
       }
 
-      if (updatePackage.downloadUrl.startsWith('/')) {
-        // Local file path
-        console.log('Using local file for update:', updatePackage.downloadUrl);
-        if (!(await RNFS.exists(updatePackage.downloadUrl))) {
-          throw new Error(`Local update file not found: ${updatePackage.downloadUrl}`);
+      const isLocalPath =
+        updatePackage.downloadUrl.startsWith('/') ||
+        updatePackage.downloadUrl.toLowerCase().startsWith('file://');
+      if (isLocalPath) {
+        // Local file path (absolute path or file:// URI from picker); same handling on iOS and Android
+        const localPath = updatePackage.downloadUrl.startsWith('file://')
+          ? updatePackage.downloadUrl.replace(/^file:\/\//i, '')
+          : updatePackage.downloadUrl;
+        console.log('Using local file for update:', localPath);
+        if (!(await RNFS.exists(localPath))) {
+          throw new Error(`Local update file not found: ${localPath}`);
         }
-        await RNFS.copyFile(updatePackage.downloadUrl, downloadPath);
+        await RNFS.copyFile(localPath, downloadPath);
         
         // Mock progress for local copy
         if (progressCallback) {
@@ -374,7 +393,7 @@ class CustomCodePush {
 
   private async logDownloadReport(updatePackage: UpdatePackage): Promise<void> {
     try {
-      if (!this.config.serverUrl || !this.config.deploymentKey) {
+      if (!this.config.serverUrl || !this.getDeploymentKey()) {
         // No reporting backend configured (e.g. ZIP+manifest-only usage)
         return;
       }
@@ -383,7 +402,7 @@ class CustomCodePush {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          deploymentKey: this.config.deploymentKey,
+          deploymentKey: this.getDeploymentKey(),
           bundleId: deviceInfo.bundleId,
           label: updatePackage.label,
           clientUniqueId: deviceInfo.clientUniqueId,
@@ -396,7 +415,7 @@ class CustomCodePush {
 
   private async logUpdateInstallation(localPackage: LocalPackage, success: boolean): Promise<void> {
     try {
-      if (!this.config.serverUrl || !this.config.deploymentKey) {
+      if (!this.config.serverUrl || !this.getDeploymentKey()) {
         // No reporting backend configured (e.g. ZIP+manifest-only usage)
         return;
       }
@@ -408,7 +427,7 @@ class CustomCodePush {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          deploymentKey: this.config.deploymentKey,
+          deploymentKey: this.getDeploymentKey(),
           bundleId: deviceInfo.bundleId,
           label: localPackage.label,
           status: success ? 'Deployed' : 'Failed',
@@ -549,7 +568,7 @@ class CustomCodePush {
 
   private async logRollback(): Promise<void> {
     try {
-      if (!this.config.serverUrl || !this.config.deploymentKey) {
+      if (!this.config.serverUrl || !this.getDeploymentKey()) {
         // No reporting backend configured (e.g. ZIP+manifest-only usage)
         return;
       }
@@ -561,7 +580,7 @@ class CustomCodePush {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          deploymentKey: this.config.deploymentKey,
+          deploymentKey: this.getDeploymentKey(),
           bundleId: deviceInfo.bundleId,
           label: this.currentPackage?.label || 'unknown',
           status: 'Rollback',
@@ -592,6 +611,44 @@ class CustomCodePush {
       return `file://${this.currentPackage.localPath}/index.bundle`;
     }
     return null;
+  }
+
+  /**
+   * Install an update from a local file (e.g. chosen from storage via file picker).
+   * Works on both iOS and Android: accepts absolute paths or file:// URIs.
+   * The file must be a ZIP containing index.bundle (and optional assets).
+   */
+  public async installUpdateFromLocalFile(
+    localFilePath: string,
+    options?: {
+      packageHash?: string;
+      installMode?: 'IMMEDIATE' | 'ON_NEXT_RESTART' | 'ON_NEXT_RESUME';
+    }
+  ): Promise<LocalPackage> {
+    await this.initialize();
+    const normalizedPath =
+      localFilePath.toLowerCase().startsWith('file://')
+        ? localFilePath.replace(/^file:\/\//i, '')
+        : localFilePath;
+    const packageHash = options?.packageHash ?? `local-${Date.now()}`;
+    const deviceInfo = await this.getDeviceInfo();
+    const updatePackage: UpdatePackage = {
+      packageHash,
+      label: packageHash.slice(0, 7),
+      appVersion: deviceInfo.appVersion || '1.0.0',
+      description: '',
+      isMandatory: false,
+      packageSize: 0,
+      downloadUrl: normalizedPath.startsWith('/') ? normalizedPath : `file://${normalizedPath}`,
+      timestamp: Date.now(),
+    };
+    const localPackage = await this.downloadUpdate(updatePackage);
+    await this.installUpdate(localPackage);
+    const mode = options?.installMode ?? this.config.installMode ?? 'ON_NEXT_RESTART';
+    if (mode === 'IMMEDIATE') {
+      this.restartApp();
+    }
+    return localPackage;
   }
 
   // Static methods for easy integration
@@ -644,16 +701,34 @@ class CustomCodePush {
       packageHash?: string;
       zipBundleUrl?: string;
       size?: number;
+      zipBundleUrlAndroid?: string;
+      zipBundleUrliOS?: string;
+      sizeAndroid?: number;
+      sizeiOS?: number;
       [key: string]: any;
     };
 
-    if (!manifest.packageHash || !manifest.zipBundleUrl) {
-      throw new Error('Invalid manifest: missing packageHash or zipBundleUrl');
+    if (!manifest.packageHash) {
+      throw new Error('Invalid manifest: missing packageHash');
     }
 
     const latestHash = manifest.packageHash;
-    const downloadUrl = manifest.zipBundleUrl;
-    const packageSize = typeof manifest.size === 'number' ? manifest.size : 0;
+
+    // Support either a single URL (zipBundleUrl) or per-platform URLs.
+    const isIOS = Platform.OS === 'ios';
+    let downloadUrl: string | undefined = manifest.zipBundleUrl;
+    let packageSize: number | undefined = manifest.size;
+
+    if (manifest.zipBundleUrlAndroid || manifest.zipBundleUrliOS) {
+      downloadUrl = isIOS ? manifest.zipBundleUrliOS ?? manifest.zipBundleUrlAndroid : manifest.zipBundleUrlAndroid ?? manifest.zipBundleUrliOS;
+      packageSize = isIOS ? manifest.sizeiOS ?? manifest.sizeAndroid : manifest.sizeAndroid ?? manifest.sizeiOS;
+    }
+
+    if (!downloadUrl) {
+      throw new Error('Invalid manifest: missing download URL for current platform');
+    }
+
+    const normalizedSize = typeof packageSize === 'number' ? packageSize : 0;
 
     const installedHash = this.currentPackage?.packageHash || null;
     const isFirstInstall = !installedHash;
@@ -673,7 +748,7 @@ class CustomCodePush {
       appVersion: deviceInfo.appVersion || '1.0.0',
       description: '',
       isMandatory: false,
-      packageSize,
+      packageSize: normalizedSize,
       downloadUrl,
       timestamp: Date.now(),
     };

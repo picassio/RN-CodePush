@@ -13,7 +13,7 @@ A React Native SDK for over-the-air (OTA) updates with support for your own back
 </p>
 <p align="center"><em>Demo App</em></p>
 
-## ZIP + manifest mode (for large bundle)App
+## ZIP + manifest mode (for large bundle)
 
 In addition to the classic CodePush-style API (`/update_check`), the SDK supports a **ZIP + manifest** mode.
 This is useful when you host a single large bundle (e.g. for a social app) and want clients to decide
@@ -21,7 +21,9 @@ This is useful when you host a single large bundle (e.g. for a social app) and w
 
 ### Manifest format
 
-Host a small JSON file (for example at `https://your-server.com/codepush/manifest.json`):
+Host a small JSON file (for example at `https://your-server.com/codepush/manifest.json`).
+
+You can either use a **single ZIP for both platforms**:
 
 ```json
 {
@@ -31,26 +33,50 @@ Host a small JSON file (for example at `https://your-server.com/codepush/manifes
 }
 ```
 
+or a **platform-specific ZIP per OS**, with one manifest URL and both URLs inside:
+
+```json
+{
+  "packageHash": "abc123def456",
+  "zipBundleUrlAndroid": "https://your-server.com/codepush/bundles/app-android.zip",
+  "zipBundleUrliOS": "https://your-server.com/codepush/bundles/app-ios.zip",
+  "sizeAndroid": 104857600,
+  "sizeiOS": 104857600
+}
+```
+
 - `packageHash`: logical version / hash of the OTA bundle.
-- `zipBundleUrl`: public URL of the ZIP bundle (can be large, e.g. 1 GB).
-- `size` (optional): used for progress UI and basic size checks.
+- `zipBundleUrl`: public URL of the ZIP bundle when using a single ZIP.
+- `zipBundleUrlAndroid` / `zipBundleUrliOS`: platform-specific ZIP URLs (when using separate bundles).
+- `size`, `sizeAndroid`, `sizeiOS` (optional): used for progress UI and basic size checks.
 
 ### Generating `manifest.json` in your build/CI
 
 You usually generate the manifest as part of your bundle/ZIP build step. One simple approach
-with Node is:
+with Node is to build and zip **both** platform bundles, then write a manifest that includes
+both URLs and sizes:
 
 ```bash
-# 1. Build your JS bundle and assets (example for React Native)
+# 1. Build JS bundles and assets
 react-native bundle \
   --platform android \
   --dev false \
   --entry-file index.js \
-  --bundle-output dist/index.bundle \
-  --assets-dest dist/assets
+  --bundle-output dist/android/index.bundle \
+  --assets-dest dist/android/assets
 
-cd dist
-zip -r app.zip index.bundle assets
+react-native bundle \
+  --platform ios \
+  --dev false \
+  --entry-file index.js \
+  --bundle-output dist/ios/index.bundle \
+  --assets-dest dist/ios/assets
+
+cd dist/android
+zip -r app-android.zip index.bundle assets
+
+cd ../ios
+zip -r app-ios.zip index.bundle assets
 ```
 
 Then a small Node script:
@@ -62,22 +88,30 @@ import crypto from 'crypto';
 import path from 'path';
 
 const distDir = 'dist';
-const bundlePath = path.join(distDir, 'index.bundle');
-const zipName = 'app.zip';
-const zipUrl = 'https://your-server.com/codepush/' + zipName;
 
-const bundleContent = fs.readFileSync(bundlePath);
+// For simplicity, hash one of the bundles (or combine hashes if you prefer)
+const bundlePathAndroid = path.join(distDir, 'android', 'index.bundle');
+const bundleContent = fs.readFileSync(bundlePathAndroid);
 const packageHash = crypto
   .createHash('sha256')
   .update(bundleContent)
   .digest('hex');
 
-const stats = fs.statSync(path.join(distDir, zipName));
+const androidZipName = 'app-android.zip';
+const iosZipName = 'app-ios.zip';
+
+const androidZipPath = path.join(distDir, 'android', androidZipName);
+const iosZipPath = path.join(distDir, 'ios', iosZipName);
+
+const androidStats = fs.statSync(androidZipPath);
+const iosStats = fs.statSync(iosZipPath);
 
 const manifest = {
   packageHash,
-  zipBundleUrl: zipUrl,
-  size: stats.size,
+  zipBundleUrlAndroid: 'https://your-server.com/codepush/' + androidZipName,
+  zipBundleUrliOS: 'https://your-server.com/codepush/' + iosZipName,
+  sizeAndroid: androidStats.size,
+  sizeiOS: iosStats.size,
 };
 
 fs.writeFileSync(
@@ -100,14 +134,14 @@ You can adapt the hashing scheme (e.g. include assets or use a git commit hash) 
 
 ### Using CustomCodePush with a manifest
 
-You can keep `serverUrl` / `deploymentKey` for the classic API, or omit them if you only use
+You can keep `serverUrl` and `deploymentKeyIOS` / `deploymentKeyAndroid` for the classic API, or omit them if you only use
 the manifest-based flow. On app startup (or whenever you want to check), call:
 
 ```ts
 import CustomCodePush from 'react-native-codepush-sdk';
 
 const codePush = new CustomCodePush({
-  // Optional: serverUrl / deploymentKey for classic mode.
+  // Optional: serverUrl and deploymentKeyIOS / deploymentKeyAndroid for classic mode.
   // Optional: manifestUrl if you want to store it in config.
   manifestUrl: EnvConfig.codePushManifestUrl,
   installMode: 'ON_NEXT_RESTART',
@@ -189,7 +223,7 @@ Add to `android/app/src/main/AndroidManifest.xml`:
 
 ## Usage
 
-App version is read from the device via `react-native-device-info`; you only configure `serverUrl` and `deploymentKey`.
+App version is read from the device via `react-native-device-info`; you configure `serverUrl` and platform keys (`deploymentKeyIOS`, `deploymentKeyAndroid`).
 
 ### Provider + component (recommended)
 
@@ -200,7 +234,8 @@ import { CodePushProvider, UpdateChecker } from 'react-native-codepush-sdk';
 
 const config = {
   serverUrl: 'https://your-codepush-server.com',
-  deploymentKey: 'your-deployment-key',
+  deploymentKeyIOS: 'your-ios-key',
+  deploymentKeyAndroid: 'your-android-key',
   checkFrequency: 'ON_APP_START',
   installMode: 'ON_NEXT_RESTART',
   minimumBackgroundDuration: 0,
@@ -254,7 +289,8 @@ import { CustomCodePush } from 'react-native-codepush-sdk';
 
 const codePush = new CustomCodePush({
   serverUrl: 'https://your-server.com',
-  deploymentKey: 'your-key',
+  deploymentKeyIOS: 'your-ios-key',
+  deploymentKeyAndroid: 'your-android-key',
 });
 
 await codePush.initialize();
@@ -270,7 +306,7 @@ if (update) {
 
 ## What you use and receive
 
-**You configure:** `serverUrl`, `deploymentKey` (and optionally `installMode`, `checkFrequency`). The SDK automatically sends `bundleId` (from the device; not configurable) with every API request for backend validation.
+**You configure:** `serverUrl`, `deploymentKeyIOS`, `deploymentKeyAndroid` (and optionally `installMode`, `checkFrequency`). The SDK automatically sends `bundleId` (from the device; not configurable) with every API request for backend validation.
 
 **You call:** `checkForUpdate()`, `syncUpdate()`, `rollback()`, `clearUpdates()`, `getBundleUrl()` (from `useCodePush()` or `CustomCodePush`).
 
@@ -287,7 +323,8 @@ Your server must expose these routes under `serverUrl` (e.g. on Vercel): `POST /
 ```typescript
 interface CodePushConfiguration {
   serverUrl?: string;           // Base URL of your update server (no trailing slash)
-  deploymentKey?: string;       // Deployment key for this app/deployment
+  deploymentKeyIOS?: string;    // iOS deployment key (e.g. from CMS dashboard)
+  deploymentKeyAndroid?: string; // Android deployment key (e.g. from CMS dashboard)
   /**
    * Optional URL to a small JSON manifest that describes the latest bundle
    * (for ZIP+manifest mode, e.g. large/social apps).
@@ -302,7 +339,7 @@ interface CodePushConfiguration {
 
 ## Minimum API (core surface)
 
-- **Config:** `serverUrl`, `deploymentKey` (optional: `installMode`, `checkFrequency`).
+- **Config:** `serverUrl`, `deploymentKeyIOS`, `deploymentKeyAndroid` (optional: `installMode`, `checkFrequency`).
 - **React:** `CodePushProvider` + `useCodePush()` (or class-based `CustomCodePush`).
 - **Call:** `checkForUpdate()`, then `syncUpdate()` (or `downloadUpdate` + `installUpdate`), and `getBundleUrl()` for the bundle to load.
 - **Get:** `getCurrentPackage()` / `getUpdateMetadata()`, and recovery via `rollback()`.
