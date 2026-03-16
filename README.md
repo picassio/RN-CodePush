@@ -2,6 +2,8 @@
 
 A React Native SDK for over-the-air (OTA) updates with support for your own backend. Use it to ship JS and asset updates without going through the app stores.
 
+**[CodePush Portal (Dashboard)](https://codepush.hyper-mind.dev/)** — manage deployments and view update status.
+
 - **Custom server**: Works with any server that implements the CodePush-style API.
 - **Unified API**: Same API on iOS and Android (provider, hook, or class-based).
 - **Optional demo**: See the `example/` app for a full setup.
@@ -428,4 +430,5 @@ MIT – see [LICENSE](LICENSE).
 
 ## Links
 
+- **[CodePush Portal (Dashboard)](https://codepush.hyper-mind.dev/)** — manage deployments and view update status
 - [Repository](https://github.com/picassio/RN-CodePush) · [Issues](https://github.com/picassio/RN-CodePush/issues)
