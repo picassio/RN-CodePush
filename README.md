@@ -8,7 +8,12 @@ A React Native SDK for over-the-air (OTA) updates with support for your own back
 - **Unified API**: Same API on iOS and Android (provider, hook, or class-based).
 - **Optional demo**: See the `example/` app for a full setup.
 
-## ZIP + manifest mode (for large bundle)
+<p align="center">
+  <img src="Screen_Recording_20260316_095707_Eduhome.gif" alt="Eduhome splash screen" width="320" />
+</p>
+<p align="center"><em>Demo App</em></p>
+
+## ZIP + manifest mode (for large bundle)App
 
 In addition to the classic CodePush-style API (`/update_check`), the SDK supports a **ZIP + manifest** mode.
 This is useful when you host a single large bundle (e.g. for a social app) and want clients to decide
