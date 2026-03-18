@@ -138,6 +138,44 @@ The included mock server provides a complete CodePush-compatible API:
 3. Create UI components in `components/`
 4. Update configuration in `config/`
 
+## Building OTA packages (ZIP + manifest)
+
+If you’re testing the SDK’s **ZIP + manifest** mode, the repo root includes 2 scripts that build the OTA ZIP and update `codepush/manifest.json`.
+
+From the repo root (not inside `example/`):
+
+```bash
+# iOS
+bash build-codepush.sh ios
+node build-manifest.js ios
+
+# Android
+bash build-codepush.sh android
+node build-manifest.js android
+```
+
+Optional: add a `package.json` script for one-liner usage (example for iOS):
+
+```json
+{
+  "scripts": {
+    "codepush:ios": "bash scripts/build-codepush.sh ios && node scripts/build-manifest.js ios"
+  }
+}
+```
+
+Then run from the repo root:
+
+```bash
+yarn codepush:ios
+```
+
+This produces:
+
+- `codepush/<platform>/index.bundle` + assets + `metadata.json`
+- `codepush_<platform>_release.zip` at the repo root
+- `codepush/manifest.json` (unified manifest with `packageHash` + platform URL/size)
+
 ### Customizing the Mock Server
 Edit `mock-server/server-supabase.js` to:
 - Add new endpoints

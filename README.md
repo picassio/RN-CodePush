@@ -52,82 +52,41 @@ or a **platform-specific ZIP per OS**, with one manifest URL and both URLs insid
 
 ### Generating `manifest.json` in your build/CI
 
-You usually generate the manifest as part of your bundle/ZIP build step. One simple approach
-with Node is to build and zip **both** platform bundles, then write a manifest that includes
-both URLs and sizes:
+This repo provides 2 scripts at the repo root to build the OTA ZIP and update `codepush/manifest.json`.
+
+Run from the repo root:
 
 ```bash
-# 1. Build JS bundles and assets
-react-native bundle \
-  --platform android \
-  --dev false \
-  --entry-file index.js \
-  --bundle-output dist/android/index.bundle \
-  --assets-dest dist/android/assets
+# iOS
+bash build-codepush.sh ios
+node build-manifest.js ios
 
-react-native bundle \
-  --platform ios \
-  --dev false \
-  --entry-file index.js \
-  --bundle-output dist/ios/index.bundle \
-  --assets-dest dist/ios/assets
-
-cd dist/android
-zip -r app-android.zip index.bundle assets
-
-cd ../ios
-zip -r app-ios.zip index.bundle assets
+# Android
+bash build-codepush.sh android
+node build-manifest.js android
 ```
 
-Then a small Node script:
+Optional: add a `package.json` script for one-liner usage (example for iOS):
 
-```js
-// build-manifest.mjs
-import fs from 'fs';
-import crypto from 'crypto';
-import path from 'path';
-
-const distDir = 'dist';
-
-// For simplicity, hash one of the bundles (or combine hashes if you prefer)
-const bundlePathAndroid = path.join(distDir, 'android', 'index.bundle');
-const bundleContent = fs.readFileSync(bundlePathAndroid);
-const packageHash = crypto
-  .createHash('sha256')
-  .update(bundleContent)
-  .digest('hex');
-
-const androidZipName = 'app-android.zip';
-const iosZipName = 'app-ios.zip';
-
-const androidZipPath = path.join(distDir, 'android', androidZipName);
-const iosZipPath = path.join(distDir, 'ios', iosZipName);
-
-const androidStats = fs.statSync(androidZipPath);
-const iosStats = fs.statSync(iosZipPath);
-
-const manifest = {
-  packageHash,
-  zipBundleUrlAndroid: 'https://your-server.com/codepush/' + androidZipName,
-  zipBundleUrliOS: 'https://your-server.com/codepush/' + iosZipName,
-  sizeAndroid: androidStats.size,
-  sizeiOS: iosStats.size,
-};
-
-fs.writeFileSync(
-  path.join(distDir, 'manifest.json'),
-  JSON.stringify(manifest, null, 2),
-  'utf8'
-);
-console.log('Manifest written to dist/manifest.json');
+```json
+{
+  "scripts": {
+    "codepush:ios": "bash scripts/build-codepush.sh ios && node scripts/build-manifest.js ios"
+  }
+}
 ```
 
-Run this in CI after the bundle/ZIP is built:
+Then run:
 
 ```bash
-node build-manifest.mjs
-# Upload dist/app.zip and dist/manifest.json to your server / CDN
+yarn codepush:ios
 ```
+
+This produces:
+
+- `codepush/<platform>/index.bundle` + assets + `metadata.json`
+- `codepush_<platform>_release.zip` at the repo root
+- `codepush/manifest.json` (unified manifest with `packageHash` + platform URL/size)
 
 You can adapt the hashing scheme (e.g. include assets or use a git commit hash) as long as
 `packageHash` stays stable for a given bundle and changes when you release a new version.
@@ -195,7 +154,7 @@ npm install react-native-codepush-sdk
 Peer dependencies (install if not already present):
 
 ```bash
-npm install react-native-fs react-native-zip-archive react-native-device-info @react-native-async-storage/async-storage
+npm install react-native-fs react-native-zip-archive react-native-device-info @react-native-async-storage/async-storage react-native-restart 
 ```
 
 ### 2. Platform setup
